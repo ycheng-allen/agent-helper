@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-codex-model-watch —— 本地监控 Codex 的模型使用、额度水位、容量拒单，并主动探测模型偷换。
+Codex Helper —— 本地监控 Codex 的模型使用、额度水位、容量拒单，并主动探测模型偷换。
 
 原理（详见 README）：
   1. 日志侧：Codex 会把每一轮会话写入 ~/.codex/sessions/**/*.jsonl（rollout 文件）。
@@ -27,6 +27,7 @@ import sys
 import threading
 import time
 import webbrowser
+from watch_scheduler import Scheduler, available_projects, init_db as init_scheduler_db, next_reset, read_quota, rule_rows, task_snapshots, validate_rule
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -67,6 +68,7 @@ def db_connect(db_path):
     CREATE TABLE IF NOT EXISTS threads(
         thread_id TEXT PRIMARY KEY, requested TEXT);
     """)
+    init_scheduler_db(conn)
     return conn
 
 
@@ -445,6 +447,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _local_json_request(self):
+        host = self.headers.get("Host", "")
+        origin = self.headers.get("Origin", "")
+        expected = "127.0.0.1:%d" % g_args.port
+        return (host == expected and self.headers.get("Content-Type", "").split(";")[0] == "application/json"
+                and (not origin or origin == "http://" + expected))
+
     def do_GET(self):
         import urllib.parse
         parsed = urllib.parse.urlparse(self.path)
@@ -471,10 +480,102 @@ class Handler(BaseHTTPRequestHandler):
                     g_last_scan = time.time()
                 self._json(api_data(conn(), days))
             return
+        if path == "/api/schedule":
+            if self.headers.get("Host", "") != "127.0.0.1:%d" % g_args.port:
+                self._json({"error": "仅允许本地面板访问"}, 403)
+                return
+            with g_lock:
+                tasks = g_scheduler.snapshots if g_scheduler else []
+                tasks = sorted(tasks, key=lambda item: (item.get("turn") or {}).get("status") != "active")
+                self._json({"rules": rule_rows(conn()),
+                            "tasks": tasks,
+                            "projects": available_projects(conn(), g_args.codex_home),
+                            "auto_resume": bool(conn().execute("SELECT 1 FROM schedule_settings WHERE key='auto_resume_since'").fetchone()),
+                            "quota_error": g_scheduler.quota_error if g_scheduler else ""})
+            return
         self.send_response(404)
         self.end_headers()
 
     def do_POST(self):
+        if self.path.split("?")[0] == "/api/schedule/auto-resume":
+            if not self._local_json_request() or g_state["demo"]:
+                self._json({"error": "只接受本地面板的真实模式请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                if not isinstance(body.get("enabled"), bool):
+                    raise ValueError("enabled 必须是布尔值")
+                with g_lock:
+                    if body["enabled"]:
+                        conn().execute("INSERT OR REPLACE INTO schedule_settings VALUES('auto_resume_since',?)", (str(time.time()),))
+                    else:
+                        conn().execute("DELETE FROM schedule_settings WHERE key='auto_resume_since'")
+                        conn().execute("UPDATE schedule_rules SET status='cancelled' WHERE auto=1 AND status='waiting'")
+                    conn().commit()
+                self._json({"enabled": body["enabled"]})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/schedule":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            if g_state["demo"]:
+                self._json({"error": "演示模式不能执行排程"}, 400)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 30000:
+                    raise ValueError("请求过大")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                snapshots = task_snapshots(g_args.codex_home)
+                with g_lock:
+                    projects = available_projects(conn(), g_args.codex_home)
+                rule = validate_rule(body, snapshots, g_args.codex_home, projects)
+                if rule["kind"] == "new" and rule["trigger"] == "quota":
+                    rule["quota_after"] = next_reset(read_quota())
+                    if rule["quota_after"] is None:
+                        raise ValueError("Codex 暂未提供下一次额度刷新时间")
+                with g_lock:
+                    if rule["project_mode"] == "create" and conn().execute("""SELECT 1 FROM schedule_rules
+                            WHERE kind='new' AND project_mode='create' AND cwd=? AND status IN ('waiting','running') LIMIT 1""",
+                            (rule["cwd"],)).fetchone():
+                        raise ValueError("这个新项目已经有一条待执行规则")
+                    if rule["kind"] == "resume" and conn().execute("""SELECT 1 FROM schedule_rules
+                            WHERE kind='resume' AND thread_id=? AND after_turn_id=?
+                            AND status IN ('waiting','running') LIMIT 1""",
+                            (rule["thread_id"], rule["after_turn_id"])).fetchone():
+                        raise ValueError("这个任务的当前轮次已有续跑规则")
+                    conn().execute("""INSERT INTO schedule_rules
+                        (id,kind,trigger,thread_id,cwd,project_mode,project_id,project_name,project_parent,
+                         prompt,run_at,quota_after,after_turn_id,after_mtime,
+                         status,auto,created_at,started_at,finished_at,error,output)
+                         VALUES(:id,:kind,:trigger,:thread_id,:cwd,:project_mode,:project_id,:project_name,:project_parent,
+                                :prompt,:run_at,:quota_after,:after_turn_id,:after_mtime,
+                                :status,:auto,:created_at,:started_at,:finished_at,:error,:output)""", rule)
+                    conn().commit()
+                if rule["trigger"] == "immediate" and g_scheduler:
+                    g_scheduler.dispatch(rule)
+                self._json({"rule": rule}, 201)
+            except (ValueError, TypeError, RuntimeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/schedule/cancel":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                with g_lock:
+                    changed = conn().execute("UPDATE schedule_rules SET status='cancelled' WHERE id=? AND status='waiting'",
+                                             (str(body.get("id") or ""),)).rowcount
+                    conn().commit()
+                self._json({"cancelled": bool(changed)})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
         if self.path.split("?")[0] == "/api/probe":
             length = int(self.headers.get("Content-Length") or 0)
             try:
@@ -496,6 +597,7 @@ class Handler(BaseHTTPRequestHandler):
 
 conn_inst = None
 g_args = None
+g_scheduler = None
 
 
 def conn():
@@ -512,8 +614,8 @@ def db_path():
 
 
 def main():
-    global g_args, g_last_scan
-    ap = argparse.ArgumentParser(description="codex-model-watch —— 本地监控 Codex 模型使用/额度/拒单，并探测模型偷换")
+    global g_args, g_last_scan, g_scheduler
+    ap = argparse.ArgumentParser(description="Codex Helper —— 本地监控 Codex 使用情况并安排任务")
     ap.add_argument("--port", type=int, default=8787, help="本地网页端口（默认 8787）")
     ap.add_argument("--codex-home", default=os.path.join(HOME, ".codex"), help="Codex 主目录（默认 ~/.codex）")
     ap.add_argument("--max-age-days", type=int, default=30, help="只解析最近 N 天的会话日志，0=全部（默认 30）")
@@ -532,10 +634,10 @@ def main():
         g_last_scan = time.time()
     n_turn = conn_.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
     n_probe = conn_.execute("SELECT COUNT(*) FROM probes").fetchone()[0]
-    print("[codex-model-watch] 已解析 %d 个文件，累计 %d 轮会话、%d 次探针" %
+    print("[codex-helper] 已解析 %d 个文件，累计 %d 轮会话、%d 次探针" %
           (stats.get("files", 0), n_turn, n_probe))
     if stats.get("note"):
-        print("[codex-model-watch] " + stats["note"])
+        print("[codex-helper] " + stats["note"])
     if g_args.scan_only:
         top = conn_.execute("""SELECT served, COUNT(*) n FROM turns GROUP BY served
                                ORDER BY n DESC LIMIT 5""").fetchall()
@@ -543,9 +645,12 @@ def main():
             print("  %-24s %d 轮" % (r[0], r[1]))
         return
 
+    g_scheduler = Scheduler(conn_, g_lock, g_args.codex_home, g_args.demo)
+    g_scheduler.start()
+
     server = ThreadingHTTPServer(("127.0.0.1", g_args.port), Handler)
     url = "http://127.0.0.1:%d" % g_args.port
-    print("[codex-model-watch] 面板地址: %s  （Ctrl+C 退出）" % url)
+    print("[codex-helper] 面板地址: %s  （Ctrl+C 退出）" % url)
     if not g_args.no_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

@@ -1,7 +1,7 @@
 {
-  "name": "codex-model-watch",
-  "version": "0.1.5",
-  "description": "Local Codex model usage monitor",
+  "name": "codex-helper",
+  "version": "0.3.2",
+  "description": "Local Codex usage monitor and task scheduler",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -14,7 +14,7 @@
   },
   "build": {
     "appId": "local.codex.modelwatch",
-    "productName": "Codex Model Watch",
+    "productName": "Codex Helper",
     "mac": {
       "category": "public.app-category.utilities",
       "icon": "electron/assets/AppIcon.icns",
@@ -24,12 +24,14 @@
       "electron/**/*",
       "web/**/*",
       "codex_model_watch.py",
+      "watch_scheduler.py",
       "README*",
       "LICENSE",
       "package.json"
     ],
     "asarUnpack": [
       "codex_model_watch.py",
+      "watch_scheduler.py",
       "web/**/*",
       "electron/assets/tray-icon.png"
     ]

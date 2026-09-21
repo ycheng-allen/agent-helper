@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>codex-model-watch</title>
+<title>Codex Helper</title>
 <style>
   :root{
     --bg:#131210; --card:#1a1917; --card2:#1f1d1a; --border:#2b2924; --border2:#38352e;
@@ -27,6 +27,13 @@
   #gen{color:var(--dim);font-size:12px}
   #demoBanner{display:none;margin-top:14px;background:rgba(224,182,79,.08);color:var(--warn);
     border:1px solid rgba(224,182,79,.4);border-radius:8px;padding:5px 12px;font-size:12px}
+  .tabs{display:flex;gap:6px;padding:6px;background:var(--card);border:1px solid var(--border);
+    border-radius:11px;margin:18px 0 4px;width:max-content;max-width:100%}
+  .tab{border:0;border-radius:7px;padding:8px 17px;background:transparent;color:var(--dim);
+    font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--txt)}.tab[aria-selected="true"]{background:var(--card2);color:var(--txt);box-shadow:0 1px 5px #0004}
+  .tab-count{display:inline-block;min-width:18px;margin-left:5px;padding:0 5px;border-radius:9px;background:rgba(91,141,239,.18);color:var(--accent);font-size:10px}
+  [hidden]{display:none!important}
   .pagehead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:26px 0 16px}
   .pagehead h1{font-size:22px;font-weight:600;color:#cfc9be;letter-spacing:1px}
   .chips{display:flex;gap:8px}
@@ -73,6 +80,45 @@
   button.pgo:disabled{opacity:.5;cursor:wait}
   .hint{color:var(--dim);font-size:11px}
   #probeOut{margin:8px 0;font-size:12.5px;min-height:20px}
+  .schedule-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:24px 0 15px}
+  .schedule-head h1{font-size:22px;font-weight:600;letter-spacing:.5px}.schedule-head p{color:var(--dim);font-size:12px;margin-top:3px}
+  .schedule-summary{display:flex;gap:8px;flex-wrap:wrap}.schedule-summary span{border:1px solid var(--border2);border-radius:8px;padding:5px 10px;color:var(--dim);font-size:11px}
+  .schedule-summary strong{color:var(--txt);font-size:14px;margin-right:4px}
+  .schedule-layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:16px;align-items:start}
+  .schedule-panel{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:18px;margin-bottom:16px}
+  .schedule-panel h2{font-size:15px;font-weight:600;letter-spacing:.2px;margin-bottom:3px}
+  .schedule-panel .sub{color:var(--dim);font-size:11px;margin-bottom:14px}
+  .auto-row{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer}
+  .auto-copy{font-size:12px;line-height:1.5}.auto-copy b{display:block;font-size:13px}.auto-copy small{display:block;color:var(--dim);margin-top:4px}
+  .switch{appearance:none;width:42px;height:24px;border-radius:20px;background:#45423d;position:relative;cursor:pointer;flex:none;transition:background .15s}
+  .switch::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;left:3px;top:3px;background:white;transition:transform .15s}
+  .switch:checked{background:var(--ok)}.switch:checked::after{transform:translateX(18px)}.switch:disabled{opacity:.55}
+  .schedule-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+  .schedule-field{display:flex;flex-direction:column;gap:5px;color:var(--dim);font-size:11px;min-width:0}
+  .schedule-field input,.schedule-field select,.schedule-field textarea{background:var(--bg);border:1px solid var(--border2);color:var(--txt);border-radius:8px;padding:9px 10px;font:inherit;font-size:12px;width:100%;outline:none}
+  .schedule-field :is(input,select,textarea):focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(91,141,239,.16)}
+  .schedule-field textarea{min-height:120px;resize:vertical;line-height:1.5}.schedule-field.wide{grid-column:1/-1}
+  .schedule-field .field-note{font-size:10px;color:var(--dim)}
+  .kind-options{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:13px}
+  .project-options{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:5px}
+  .kind-option{border:1px solid var(--border2);border-radius:8px;background:var(--bg);color:var(--dim);padding:9px 5px;font:inherit;font-size:11px;cursor:pointer;text-align:center;line-height:1.25}
+  .kind-option.active{border-color:var(--accent);background:rgba(91,141,239,.12);color:var(--txt)}
+  .primary-action{background:var(--accent);border:1px solid var(--accent);color:white;border-radius:8px;padding:9px 17px;font:inherit;font-size:12px;cursor:pointer}
+  .primary-action:hover{filter:brightness(1.12)}.primary-action:disabled{opacity:.5;cursor:wait}
+  .schedule-form-actions{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  .schedule-message{font-size:11px;min-height:18px;margin-top:10px;color:var(--dim)}
+  .schedule-message.error{color:var(--fail)}.schedule-message.success{color:var(--ok)}
+  .schedule-list{display:grid;gap:9px}
+  .schedule-item{border:1px solid var(--border);border-radius:9px;padding:12px 13px;font-size:12px;overflow-wrap:anywhere;background:var(--card2)}
+  .schedule-item-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:6px}
+  .schedule-item .prompt{white-space:pre-wrap;line-height:1.45;max-height:4.4em;overflow:hidden}
+  .schedule-item .meta{color:var(--dim);font-size:11px;margin-top:7px}
+  .schedule-item button{margin-left:auto;background:transparent;color:var(--warn);border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px}
+  .schedule-item button:hover{border-color:var(--warn)}
+  .schedule-filter{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
+  .schedule-filter button{border:1px solid var(--border2);background:transparent;border-radius:7px;color:var(--dim);padding:4px 10px;font:inherit;font-size:11px;cursor:pointer}
+  .schedule-filter button.active{background:var(--card2);color:var(--txt)}
+  .empty-state{color:var(--dim);padding:25px 12px;text-align:center;font-size:12px;border:1px dashed var(--border2);border-radius:8px}
   .squares{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 14px}
   .sq{width:14px;height:14px;border-radius:3px;background:rgba(144,137,124,.15)}
   .sq.ok{background:rgba(70,196,124,.55)}
@@ -99,20 +145,31 @@
     .qbar .track{flex-basis:130px}.qbar{gap:6px}.qbar .hint{font-size:9px}
     .toolbar{gap:6px}.hint{font-size:9px}input.pmodel{width:155px;padding:6px 8px;font-size:11px}button.pgo{padding:6px 10px;font-size:11px}
     .foot{font-size:9px}
+    .tabs{width:100%;margin:12px 0 2px}.tab{flex:1;padding:8px 5px;font-size:11px}
+    .schedule-head{margin:14px 0 10px}.schedule-head h1{font-size:18px}
+    .schedule-layout{grid-template-columns:1fr;gap:0}.schedule-panel{padding:13px;margin-bottom:10px}
+    .schedule-grid{gap:9px}.kind-option{font-size:10px;padding:8px 3px}
   }
+  @media(min-width:521px) and (max-width:900px){.schedule-layout{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <div class="logo"><b>CODEX</b><span>model watch · 本地监控面板</span></div>
-    <span class="title">模型使用 · 额度水位 · 容量拒单 · 偷换探针</span>
+    <div class="logo"><b>CODEX HELPER</b><span>额度监控与任务排程</span></div>
+    <span class="title">模型使用 · 额度水位 · 自动续跑</span>
     <div class="right">
       <span id="gen">加载中…</span>
-      <button class="iconbtn" title="手动刷新" onclick="load()">⟳</button>
+      <button class="iconbtn" title="刷新当前页面" aria-label="刷新当前页面" onclick="refreshCurrentTab()">⟳</button>
     </div>
   </div>
   <div id="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
+  <nav class="tabs" role="tablist" aria-label="主导航" onkeydown="handleTabKey(event)">
+    <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')">监控总览</button>
+    <button class="tab" id="tab-schedule" role="tab" aria-controls="view-schedule" aria-selected="false" onclick="setTab('schedule')">任务排程 <span class="tab-count" id="sTabCount" hidden></span></button>
+  </nav>
+
+  <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
 
   <div class="pagehead">
     <h1>监控总览</h1>
@@ -151,6 +208,69 @@
 
   <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 日志来自 ~/.codex/sessions/ 的本地会话记录 ·
     已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证，无法从历史日志还原</div>
+  </section>
+
+  <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
+    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex 在约定的时间或任务完成后继续工作。</p></div>
+      <div class="schedule-summary" id="sSummary"></div></div>
+    <div class="schedule-layout">
+      <div>
+        <div class="schedule-panel">
+          <label class="auto-row" for="sAuto"><span class="auto-copy"><b>额度恢复后自动续跑</b>
+            <small>开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。</small></span>
+            <input type="checkbox" class="switch" id="sAuto" onchange="setAutoResume()" aria-label="额度恢复后自动续跑"></label>
+        </div>
+        <form class="schedule-panel" id="sForm" onsubmit="event.preventDefault();addSchedule()">
+          <h2>创建一次性规则</h2><p class="sub">选择要做的事，填写触发条件和指令。</p>
+          <div class="kind-options" role="group" aria-label="任务动作">
+            <button type="button" class="kind-option active" data-kind="new" onclick="chooseKind('new')">启动新任务</button>
+            <button type="button" class="kind-option" data-kind="next" onclick="chooseKind('next')">发送下一步</button>
+            <button type="button" class="kind-option" data-kind="resume" onclick="chooseKind('resume')">续跑任务</button>
+          </div>
+          <input type="hidden" id="sKind" value="new">
+          <div class="schedule-grid">
+            <label class="schedule-field wide" id="sTriggerBox">何时运行<select id="sTrigger" onchange="scheduleFields()">
+              <option value="at">指定时间</option><option value="quota">下一次额度刷新后</option><option value="after">另一任务完成后</option></select></label>
+            <div class="schedule-field wide" id="sTaskBox" hidden>
+              <label class="schedule-field">项目<select id="sTaskProject" onchange="updateTaskOptions()"></select></label>
+              <label class="schedule-field" style="margin-top:10px">具体任务（对话）<select id="sTask" onchange="updateTaskNote()"></select></label>
+              <span class="field-note" id="sTaskNote">先选项目，再选具体任务。</span>
+            </div>
+            <label class="schedule-field wide" id="sTimeBox">执行时间<input type="datetime-local" id="sTime"></label>
+            <div class="schedule-field wide" id="sProjectModeBox">任务所属项目
+              <div class="project-options" role="group" aria-label="项目来源">
+                <button type="button" class="kind-option active" data-project-mode="existing" onclick="chooseProjectMode('existing')">选择现有项目</button>
+                <button type="button" class="kind-option" data-project-mode="create" onclick="chooseProjectMode('create')">创建新项目</button>
+              </div><input type="hidden" id="sProjectMode" value="existing"></div>
+            <label class="schedule-field wide" id="sExistingProjectBox">已保存的本地 Codex 项目<select id="sProject"></select>
+              <span class="field-note">从 Codex 本机的项目列表读取。</span></label>
+            <div class="schedule-field wide" id="sNewProjectBox" hidden>
+              <label class="schedule-field">新项目名称<input id="sProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
+              <label class="schedule-field" style="margin-top:10px">保存到哪个文件夹<input id="sProjectParent" list="sProjectParents" placeholder="例如 /Users/你/Documents/Codex" autocomplete="off"></label>
+              <datalist id="sProjectParents"></datalist>
+              <span class="field-note">规则触发时创建新目录，并在其中启动任务。</span>
+            </div>
+            <label class="schedule-field wide"><span id="sPromptLabel">任务指令</span><textarea id="sPrompt" placeholder="描述希望 Codex 完成的工作"></textarea>
+              <span class="field-note" id="sPromptNote">保存后只执行一次；应用需保持运行。</span></label>
+          </div>
+          <div class="schedule-form-actions"><button type="submit" class="primary-action" id="sSave">保存规则</button>
+            <span class="hint">本地保存 · 可在执行前取消</span></div>
+          <div id="sMessage" class="schedule-message" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+      <div class="schedule-panel">
+        <h2>Schedule 队列</h2><p class="sub">等待中的规则按计划时间展示；触发条件满足后开始执行。</p>
+        <div class="schedule-filter" id="sFilters" role="group" aria-label="筛选排程规则">
+          <button type="button" class="active" data-filter="active" onclick="setRuleFilter('active')">进行中</button>
+          <button type="button" data-filter="history" onclick="setRuleFilter('history')">历史</button>
+          <button type="button" data-filter="all" onclick="setRuleFilter('all')">全部</button>
+        </div>
+        <div id="sQuotaError" class="schedule-message error" role="status" hidden></div>
+        <div id="sList" class="schedule-list"></div>
+      </div>
+    </div>
+    <div class="foot">每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度。电脑睡眠期间不会触发，唤醒后继续检查。</div>
+  </section>
 </div>
 
 <script>/**
@@ -270,8 +390,31 @@ async function load(){
   dLast=d;
   $('#gen').textContent='更新于 '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · 演示数据':'');
   $('#demoBanner').style.display=d.meta.demo?'block':'none';
-  render(d);
+  $('#sAuto').disabled=!!d.meta.demo;
+  $('#sSave').disabled=!!d.meta.demo;
+  if(d.meta.demo)scheduleMessage('演示模式仅展示排程界面，无法保存规则。');
+  if(!$('#view-overview').hidden)render(d);
 }
+
+function setTab(name,updateHash=true){
+  const schedule=name==='schedule';
+  $('#view-overview').hidden=schedule;
+  $('#view-schedule').hidden=!schedule;
+  $('#tab-overview').setAttribute('aria-selected',String(!schedule));
+  $('#tab-schedule').setAttribute('aria-selected',String(schedule));
+  if(updateHash&&location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+  if(!schedule&&dLast)render(dLast);
+}
+function handleTabKey(event){
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+  event.preventDefault();
+  const target=event.key==='ArrowLeft'||event.key==='Home'?'overview':'schedule';
+  setTab(target);$('#tab-'+target).focus();
+}
+function refreshCurrentTab(){
+  if($('#view-schedule').hidden)load();else loadSchedule();
+}
+window.addEventListener('hashchange',()=>setTab(location.hash==='#schedule'?'schedule':'overview',false));
 
 function setWin(sec){
   winSec=sec;
@@ -301,7 +444,185 @@ async function runProbe(){
   btn.disabled=false;btn.textContent='立即探测';
 }
 
-load();setInterval(load,60000);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let scheduleData={rules:[],tasks:[]};
+let ruleFilter='active';
+let projectOptionsKey=null;
+const taskStatus={active:'运行中',completed:'已完成',failed:'失败',stopped:'7 天无更新'};
+const ruleStatus={waiting:'等待中',running:'执行中',done:'已完成',failed:'执行失败',cancelled:'已取消',unknown:'需检查'};
+const ruleKind={new:'新任务',next:'下一步',resume:'续跑任务'};
+function chooseKind(kind){
+  $('#sKind').value=kind;
+  document.querySelectorAll('.kind-option').forEach(button=>button.classList.toggle('active',button.dataset.kind===kind));
+  scheduleFields();
+}
+function chooseProjectMode(mode){
+  $('#sProjectMode').value=mode;
+  document.querySelectorAll('[data-project-mode]').forEach(button=>button.classList.toggle('active',button.dataset.projectMode===mode));
+  scheduleFields();
+}
+function scheduleFields(){
+  const kind=$('#sKind').value, trigger=$('#sTrigger').value;
+  $('#sTriggerBox').hidden=kind!=='new';
+  $('#sTaskBox').hidden=kind==='new'&&trigger!=='after';
+  $('#sTimeBox').hidden=kind!=='new'||trigger!=='at';
+  $('#sProjectModeBox').hidden=kind!=='new';
+  $('#sExistingProjectBox').hidden=kind!=='new'||$('#sProjectMode').value!=='existing';
+  $('#sNewProjectBox').hidden=kind!=='new'||$('#sProjectMode').value!=='create';
+  $('#sPromptLabel').textContent=kind==='resume'?'继续指令（可留空）':kind==='next'?'下一步 Prompt':'任务指令';
+  $('#sPrompt').placeholder=kind==='resume'?'留空则使用默认续跑指令':kind==='next'?'当前对话完成后要执行的下一步':'描述希望 Codex 完成的工作';
+  updateTaskOptions();
+}
+function updateProjectOptions(){
+  const projects=scheduleData.projects||[];
+  const key=projects.map(p=>p.id+':'+p.name+':'+p.path).join('|');
+  if(key===projectOptionsKey)return;
+  projectOptionsKey=key;
+  const chosen=$('#sProject').value;
+  $('#sProject').innerHTML='<option value="">'+(projects.length?'选择现有项目':'暂无已保存的本地项目')+'</option>'+
+    projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.path)}</option>`).join('');
+  if(projects.some(p=>p.id===chosen))$('#sProject').value=chosen;
+  const parents=[...new Set(projects.map(p=>p.path.slice(0,p.path.lastIndexOf('/'))).filter(Boolean))];
+  $('#sProjectParents').innerHTML=parents.map(path=>`<option value="${esc(path)}"></option>`).join('');
+  if(!$('#sProjectParent').value&&!$('#sProjectParent').dataset.suggested&&parents.length){
+    $('#sProjectParent').value=parents[0];$('#sProjectParent').dataset.suggested='true';
+  }
+}
+function eligibleTasks(){
+  const kind=$('#sKind').value,trigger=$('#sTrigger').value;
+  if(kind==='new'&&trigger!=='after')return [];
+  return (scheduleData.tasks||[]).filter(t=>{
+    const status=(t.turn||{}).status;
+    return kind==='new'?status==='active':true;
+  });
+}
+function taskProjectKey(task){return task.project_id||task.project_path||task.cwd||'unassigned';}
+function updateTaskOptions(){
+  const tasks=eligibleTasks();
+  const projects=new Map();
+  tasks.forEach(t=>{const key=taskProjectKey(t);if(!projects.has(key))projects.set(key,t.project_name||'未归类');});
+  const projectSelect=$('#sTaskProject'),previousProject=projectSelect.value;
+  projectSelect.innerHTML='<option value="">'+(projects.size?'选择项目':'暂无符合条件的项目')+'</option>'+
+    [...projects].sort((a,b)=>a[1].localeCompare(b[1],'zh')).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
+  if(projects.has(previousProject))projectSelect.value=previousProject;
+  const projectKey=projectSelect.value;
+  const shown=tasks.filter(t=>taskProjectKey(t)===projectKey);
+  const chosen=$('#sTask').value;
+  $('#sTask').innerHTML='<option value="">'+(projectKey?'选择具体任务':'请先选择项目')+'</option>'+shown.map(t=>
+    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${esc(taskStatus[(t.turn||{}).status]||'状态未知')}</option>`).join('');
+  if(shown.some(t=>t.id===chosen))$('#sTask').value=chosen;
+  updateTaskNote();
+}
+function updateTaskNote(){
+  const kind=$('#sKind').value,task=(scheduleData.tasks||[]).find(t=>t.id===$('#sTask').value);
+  const status=(task?.turn||{}).status;
+  $('#sTaskNote').textContent=kind==='new'?'关联任务完成后启动新任务。':
+    status==='stopped'?'该任务已超过 7 天无更新，保存后立即执行。':
+    status==='completed'||status==='failed'?'该任务已结束，保存后立即执行。':
+    status==='active'?(kind==='resume'?'任务因额度中断且额度恢复后续跑。':'当前对话结束后发送下一步。'):
+    '先选项目，再选具体任务；状态未知的任务暂不能执行。';
+}
+function setRuleFilter(filter){
+  ruleFilter=filter;
+  document.querySelectorAll('#sFilters button').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));
+  renderScheduleQueue();
+}
+function triggerText(rule){
+  if(rule.trigger==='immediate')return '立即执行';
+  if(rule.trigger==='at')return '指定时间 · '+new Date(rule.run_at*1000).toLocaleString();
+  if(rule.trigger==='quota'){
+    if(rule.kind==='new'&&rule.quota_after)return '额度刷新后 · 预计 '+new Date(rule.quota_after*1000).toLocaleString();
+    return '额度恢复后';
+  }
+  return '关联任务完成后';
+}
+function renderScheduleQueue(){
+  const rules=scheduleData.rules||[];
+  const active=rules.filter(r=>r.status==='waiting'||r.status==='running');
+  const plannedTime=r=>r.run_at||r.quota_after||r.created_at;
+  const waiting=active.filter(r=>r.status==='waiting').sort((a,b)=>plannedTime(a)-plannedTime(b)||a.created_at-b.created_at);
+  const running=active.filter(r=>r.status==='running').sort((a,b)=>a.created_at-b.created_at);
+  const history=rules.filter(r=>r.status!=='waiting'&&r.status!=='running').sort((a,b)=>b.created_at-a.created_at);
+  const shown=ruleFilter==='active'?[...running,...waiting]:ruleFilter==='history'?history:[...running,...waiting,...history];
+  const position=new Map(waiting.map((r,i)=>[r.id,i+1]));
+  $('#sSummary').innerHTML=`<span><strong>${waiting.length}</strong>等待</span><span><strong>${running.length}</strong>执行中</span>`;
+  $('#sTabCount').hidden=active.length===0;
+  $('#sTabCount').textContent=String(active.length);
+  $('#sList').innerHTML=shown.map(r=>{
+    const label=r.status==='waiting'?'等待 #'+position.get(r.id):ruleStatus[r.status]||r.status;
+    const cls=r.status==='failed'||r.status==='unknown'?'b-bad':r.status==='done'?'b-ok':r.status==='running'?'b-warn':'b-off';
+    const target=(scheduleData.tasks||[]).find(t=>t.id===r.thread_id);
+    const targetName=target?(target.title||target.id).slice(0,48):r.thread_id?.slice(0,8)||'';
+    const projectName=r.kind==='new'?(r.project_name||''):'';
+    return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(label)}</span>
+      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.auto?'<span class="hint">自动监控</span>':''}
+      ${r.status==='waiting'?`<button type="button" onclick="cancelSchedule('${esc(r.id)}')">取消</button>`:''}</div>
+      <div class="prompt">${esc(r.prompt)}</div>
+      <div class="meta">${esc(triggerText(r))}${projectName?' · 项目 '+esc(projectName):''}${targetName?' · 任务 '+esc(targetName):''}</div>
+      ${r.error?`<div class="meta" style="color:var(--fail)">${esc(r.error.slice(0,200))}</div>`:''}
+      ${r.output?`<div class="meta">任务 ID：${esc(r.output)}</div>`:''}</article>`;
+  }).join('')||`<div class="empty-state">${ruleFilter==='history'?'还没有执行记录':'队列为空。创建规则后会在这里显示。'}</div>`;
+}
+async function loadSchedule(){
+  try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error('读取失败');scheduleData=await response.json();}
+  catch(e){$('#sQuotaError').hidden=false;$('#sQuotaError').textContent='排程队列暂时无法更新';return;}
+  $('#sAuto').checked=!!scheduleData.auto_resume;
+  updateProjectOptions();
+  updateTaskOptions();
+  const warning=$('#sQuotaError');warning.hidden=!scheduleData.quota_error;
+  warning.textContent=scheduleData.quota_error?'额度读取暂不可用：'+scheduleData.quota_error:'';
+  renderScheduleQueue();
+}
+function scheduleMessage(message,kind=''){
+  const el=$('#sMessage');el.textContent=message;el.className='schedule-message'+(kind?' '+kind:'');
+}
+async function addSchedule(){
+  const kind=$('#sKind').value, trigger=kind==='new'?$('#sTrigger').value:kind==='resume'?'quota':'after';
+  const prompt=$('#sPrompt').value.trim();
+  if(kind!=='resume'&&!prompt){scheduleMessage('请填写任务指令','error');$('#sPrompt').focus();return;}
+  if((kind!=='new'||trigger==='after')&&!$('#sTask').value){scheduleMessage('请选择关联任务','error');$('#sTask').focus();return;}
+  const projectMode=$('#sProjectMode').value;
+  if(kind==='new'&&projectMode==='existing'&&!$('#sProject').value){scheduleMessage('请选择现有项目','error');$('#sProject').focus();return;}
+  if(kind==='new'&&projectMode==='create'&&(!$('#sProjectName').value.trim()||!$('#sProjectParent').value.trim())){
+    scheduleMessage('请填写新项目名称和保存位置','error');return;
+  }
+  let runAt=null;
+  if(kind==='new'&&trigger==='at'){
+    const value=$('#sTime').value,when=new Date(value);
+    if(!value||!Number.isFinite(when.getTime())||when.getTime()<=Date.now()){
+      scheduleMessage('请选择将来的执行时间','error');$('#sTime').focus();return;
+    }
+    runAt=when.toISOString();
+  }
+  const body={kind,trigger,thread_id:$('#sTask').value,prompt,run_at:runAt,
+    project_mode:kind==='new'?projectMode:null,project_id:$('#sProject').value,
+    project_name:$('#sProjectName').value,project_parent:$('#sProjectParent').value};
+  const button=$('#sSave');button.disabled=true;button.textContent='保存中…';scheduleMessage('正在保存规则');
+  try{const response=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');
+    $('#sPrompt').value='';scheduleMessage(result.rule?.trigger==='immediate'?'已开始执行':'已加入排程队列','success');setRuleFilter('active');await loadSchedule();
+  }catch(e){scheduleMessage(String(e.message||e),'error');}
+  finally{button.disabled=false;button.textContent='保存规则';}
+}
+async function cancelSchedule(id){
+  try{const response=await fetch('/api/schedule/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    const result=await response.json();if(!response.ok||!result.cancelled)throw new Error(result.error||'规则已开始执行，无法取消');
+    scheduleMessage('已取消等待中的规则','success');await loadSchedule();
+  }catch(e){scheduleMessage(String(e.message||e),'error');}
+}
+async function setAutoResume(){
+  const control=$('#sAuto'),enabled=control.checked;control.disabled=true;
+  try{const response=await fetch('/api/schedule/auto-resume',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({enabled})});const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');
+    scheduleMessage(enabled?'已开启自动续跑':'已关闭自动续跑','success');await loadSchedule();
+  }catch(e){control.checked=!enabled;scheduleMessage(String(e.message||e),'error');}
+  finally{control.disabled=false;}
+}
+
+const initialTime=new Date(Date.now()+3600000);
+$('#sTime').value=new Date(initialTime.getTime()-initialTime.getTimezoneOffset()*60000).toISOString().slice(0,16);
+setTab(location.hash==='#schedule'?'schedule':'overview',false);
+scheduleFields();loadSchedule();load();setInterval(load,60000);setInterval(loadSchedule,5000);
 </script>
 </body>
 </html>
