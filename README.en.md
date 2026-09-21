@@ -1,5 +1,7 @@
 # Codex Helper
 
+[中文](README.md) | **English**
+
 Codex Helper is a local task monitor and scheduler for Codex. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back.
 
 The Chinese tagline says it best: *the bicycle you are too precious to ride gets stood-on and pedaled by Codex Helper.*

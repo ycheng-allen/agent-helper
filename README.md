@@ -1,5 +1,7 @@
 # Codex Helper
 
+**中文** | [English](README.en.md)
+
 > 你舍不得骑的自行车，别人站起来蹬，codex helper，帮你站起来蹬！
 
 Codex Helper 是一个跑在本机的 Codex 任务监控与排程助手。它盯着正在工作的任务，记住你想做的下一步，在额度恢复、前一项任务结束或指定时间到达时，替你把下一句 Prompt 送回正确的 Codex 对话。
