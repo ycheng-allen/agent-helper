@@ -670,9 +670,8 @@ function t(key){const e=I18N[key];return e?(LANG==='en'?e.en:e.ch):key;}
 function setLang(lang){
   LANG=lang==='en'?'en':'ch';
   try{localStorage.setItem('cmw-lang',LANG);}catch(e){}
-  const btn=document.getElementById('langBtn');
-  if(btn)btn.textContent=LANG==='en'?'中文':'EN';
   applyI18n();
+  applyAgentFrame();
   if(dLast)render(dLast);
   loadSchedule();loadSprint();loadStats();
 }
