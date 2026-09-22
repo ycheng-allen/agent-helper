@@ -930,13 +930,13 @@ function renderStats(){
   const inWindow=d=>d===0||true; // 月卡固定本月；趋势图窗口由图表自身控制
   const mom=prev.total_cny?(month.total_cny-prev.total_cny)/prev.total_cny*100:null;
   const agents=s.per_agent||{};
+  const unpricedSub=month.unpriced_tokens?` · 未计价 ${fmtTok(month.unpriced_tokens)} tok`:'';
   $('#statCards').innerHTML=
-    `<div class="card"><div class="k">本月费用（¥）</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(month.total_cny||0)}</div><div class="s">${prev.total_cny?`上月 ¥${(prev.total_cny).toFixed(2)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}</div></div>`+
-    `<div class="card"><div class="k">本月费用（$）</div><div class="v">${fmtMoney(month.usd||0,'usd')}</div><div class="s">Codex 官方牌价折算</div></div>`+
+    `<div class="card"><div class="k">本月合计费用</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(month.total_cny||0)}</div><div class="s">${prev.total_cny?`上月 ¥${(prev.total_cny).toFixed(2)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
+    `<div class="card"><div class="k">Codex 费用</div><div class="v">${fmtMoney((s.per_agent.codex||{}).usd||0,'usd')}</div><div class="s">≈ ¥${((s.per_agent.codex||{}).cny||0).toFixed(2)} · 汇率 ${s.usd_cny}</div></div>`+
+    `<div class="card"><div class="k">ZCode 费用</div><div class="v">${fmtMoney((s.per_agent.zcode||{}).cny||0)}</div><div class="s">GLM 官方牌价折算</div></div>`+
     `<div class="card"><div class="k">本月 Tokens</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">输入 ${fmtTok(s.totals.tokens_in)} · 输出 ${fmtTok(s.totals.tokens_out)}</div></div>`+
-    `<div class="card"><div class="k">缓存命中</div><div class="v ac">${s.totals.cache_hit||0}%</div><div class="s">命中 ${fmtTok(s.totals.tokens_cached)} tok</div></div>`+
-    `<div class="card"><div class="k">本月轮次</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">错误 ${fmt(s.totals.errors)} 次</div></div>`+
-    `<div class="card"><div class="k">未计价 Tokens</div><div class="v ${month.unpriced_tokens?'swap':''}">${fmtTok(month.unpriced_tokens||0)}</div><div class="s">可在 pricing.json 补价</div></div>`;
+    `<div class="card"><div class="k">本月轮次</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">错误 ${fmt(s.totals.errors)} 次</div></div>`;
   // 每日费用堆叠柱
   const daily=(s.daily||[]).slice(-statRange||undefined);
   const dates=[...new Set(daily.map(d=>d.date))].sort();
