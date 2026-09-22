@@ -2,7 +2,7 @@
 
 [中文](README.md) | **English**
 
-Codex Helper is a local task monitor and scheduler for Codex. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back.
+Codex Helper is a local task monitor and scheduler for Codex and ZCode. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back. The Overview also tracks ZCode usage (read-only import from `~/.zcode/cli/db/`) alongside Codex: models, tokens and errors per agent.
 
 The Chinese tagline says it best: *the bicycle you are too precious to ride gets stood-on and pedaled by Codex Helper.*
 
@@ -55,9 +55,11 @@ Codex Helper extends that foundation with an Electron menu-bar app, task monitor
 
 ## Privacy and boundaries
 
-Codex Helper reads local Codex session indexes and rollout logs. Rules are stored in `~/.codex-model-watch/state.db`. The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
+Codex Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.codex-model-watch/state.db`. The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
 
 This is a local helper, not a cloud queue. It cannot trigger work while the app or computer is asleep. Codex's internal rollout formats may change. The active probe uses a small request and only runs when you explicitly trigger it.
+
+ZCode support covers usage statistics only: ZCode has no public CLI or live-quota API, so the probe, scheduling and quota panels remain Codex-only. By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
 
 ## License
 

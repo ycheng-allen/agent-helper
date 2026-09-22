@@ -174,11 +174,12 @@
   <div class="pagehead">
     <h1>监控总览</h1>
     <div class="chips" id="winBtns"></div>
+    <div class="chips" id="agentBtns" hidden></div>
   </div>
 
   <div class="cards" id="cards"></div>
 
-  <div class="panel"><h2>Codex 额度水位</h2><div id="quota"></div></div>
+  <div class="panel" id="quotaPanel"><h2>Codex 额度水位</h2><div id="quota"></div></div>
 
   <div class="panel"><h2>会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
 
@@ -191,7 +192,7 @@
     <div class="panel"><h2>最近异常（含容量拒单）</h2><table id="tErr"></table></div>
   </div>
 
-  <div class="panel"><h2>偷换探针
+  <div class="panel" id="probePanel"><h2>偷换探针（仅 Codex）
       <span id="pNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
@@ -206,12 +207,12 @@
     <div style="overflow-x:auto"><table id="tProbe"></table></div>
   </div>
 
-  <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 日志来自 ~/.codex/sessions/ 的本地会话记录 ·
-    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证，无法从历史日志还原</div>
+  <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
+    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证；ZCode 无实时额度接口，额度面板与探针仅支持 Codex</div>
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
-    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex 在约定的时间或任务完成后继续工作。</p></div>
+    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex 在约定的时间或任务完成后继续工作（排程仅支持 Codex）。</p></div>
       <div class="schedule-summary" id="sSummary"></div></div>
     <div class="schedule-layout">
       <div>
@@ -309,6 +310,11 @@ function modelBadge(m){
   const color=hit?hit[1]:'#9a948a';
   return `<span class="mbadge" style="background:${color}">${m}</span>`;
 }
+const AGENT_NAMES={codex:'Codex',zcode:'ZCode'};
+let agentSel='';
+const agentTag=a=>a==='zcode'
+  ?'<span class="badge" style="background:rgba(224,182,79,.12);color:var(--warn)">ZCode</span>'
+  :'<span class="badge" style="background:rgba(91,141,239,.14);color:var(--accent)">Codex</span>';
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
@@ -346,8 +352,9 @@ function render(d){
   const s=d.summary||{};
   const ps=d.probe_summary||{};
   const cov=d.coverage||{};
+  const agLine=(d.agents||[]).map(a=>`${AGENT_NAMES[a.agent]||a.agent} ${fmt(a.turns)}`).join(' · ');
   $('#cards').innerHTML=
-    `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮</div></div>`+
+    `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮${agLine?' · '+agLine:''}</div></div>`+
     `<div class="card"><div class="k">Token 输入</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">输出 ${fmtTok(s.tokens_out)} · 缓存命中 ${fmtTok(s.tokens_cached)}</div></div>`+
     `<div class="card"><div class="k">容量拒单</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">上游容量不足直接拒绝</div></div>`+
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
@@ -368,8 +375,8 @@ function render(d){
   charts.t?.destroy();charts.t=new Chart($('#cTrend'),tCfg);
   const models=d.models||[];
   const tot=models.reduce((a,m)=>a+m.turns,0)||1;
-  $('#tModel').innerHTML='<tr><th>模型</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th></tr>'+
-    models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${fmt(m.turns)}</td>
+  $('#tModel').innerHTML='<tr><th>模型</th><th>来源</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th></tr>'+
+    models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${agentTag(m.agent)}</td><td>${fmt(m.turns)}</td>
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
       <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td></tr>`).join('');
@@ -377,8 +384,9 @@ function render(d){
   $('#tProj').innerHTML='<tr><th>项目</th><th>轮次</th><th>tokens</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">暂无</td></tr>');
   const er=d.errors_recent||[];
-  $('#tErr').innerHTML='<tr><th>时间</th><th>模型</th><th>类型</th><th>消息</th></tr>'+
+  $('#tErr').innerHTML='<tr><th>时间</th><th>模型</th><th>来源</th><th>类型</th><th>消息</th></tr>'+
     (er.length?er.slice(0,12).map(e=>`<tr><td>${String(e.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(e.model)}</td>
+      <td>${agentTag(e.agent)}</td>
       <td><span class="badge ${e.error_kind==='capacity'||e.error_kind==='server_overloaded'?'b-bad':'b-warn'}">${e.error_kind}</span></td>
       <td style="text-align:left;color:var(--dim);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_msg||'').replace(/"/g,'')}">${e.error_msg||''}</td></tr>`).join(''):'<tr><td style="color:var(--ok)">没有错误 ✓</td></tr>');
   const probes=d.probes||[];
@@ -398,7 +406,7 @@ function render(d){
 
 async function load(){
   let d;
-  try{d=await(await fetch('/api/data?days='+Math.ceil(winSec/86400))).json();}
+  try{d=await(await fetch('/api/data?days='+Math.ceil(winSec/86400)+'&agent='+encodeURIComponent(agentSel))).json();}
   catch(e){$('#gen').textContent='无法连接本地服务';return;}
   dLast=d;
   $('#gen').textContent='更新于 '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · 演示数据':'');
@@ -406,7 +414,28 @@ async function load(){
   $('#sAuto').disabled=!!d.meta.demo;
   $('#sSave').disabled=!!d.meta.demo;
   if(d.meta.demo)scheduleMessage('演示模式仅展示排程界面，无法保存规则。');
+  const enabled=d.meta.agents_enabled||[];
+  const multi=enabled.length>1;
+  const box=$('#agentBtns');
+  box.hidden=!multi;
+  if(multi){
+    const btns=[['','全部']].concat(enabled.map(a=>[a,AGENT_NAMES[a]||a]));
+    const key=btns.map(b=>b[0]).join('|');
+    if(box.dataset.key!==key){
+      box.dataset.key=key;
+      box.innerHTML=btns.map(([id,lab])=>`<button type="button" class="chip ${id===agentSel?'on':''}" data-agent="${id}" onclick="setAgent('${id}')">${lab}</button>`).join('');
+    }else{
+      box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.agent===agentSel));
+    }
+  }
+  $('#quotaPanel').hidden=!enabled.includes('codex');
+  $('#probePanel').hidden=!enabled.includes('codex');
   if(!$('#view-overview').hidden)render(d);
+}
+function setAgent(a){
+  agentSel=a;
+  document.querySelectorAll('#agentBtns .chip').forEach(x=>x.classList.toggle('on',x.dataset.agent===a));
+  load();
 }
 
 function setTab(name,updateHash=true){
