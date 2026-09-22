@@ -212,7 +212,7 @@
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
-    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex 在约定的时间或任务完成后继续工作（排程仅支持 Codex）。</p></div>
+    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex / ZCode 在约定的时间或任务完成后继续工作。ZCode 任务的中断续跑采用定时重试（无实时额度接口）。</p></div>
       <div class="schedule-summary" id="sSummary"></div></div>
     <div class="schedule-layout">
       <div>
@@ -243,8 +243,8 @@
                 <button type="button" class="kind-option active" data-project-mode="existing" onclick="chooseProjectMode('existing')">选择现有项目</button>
                 <button type="button" class="kind-option" data-project-mode="create" onclick="chooseProjectMode('create')">创建新项目</button>
               </div><input type="hidden" id="sProjectMode" value="existing"></div>
-            <label class="schedule-field wide" id="sExistingProjectBox">已保存的本地 Codex 项目<select id="sProject"></select>
-              <span class="field-note">从 Codex 本机的项目列表读取。</span></label>
+            <label class="schedule-field wide" id="sExistingProjectBox">已保存的本地项目<select id="sProject"></select>
+              <span class="field-note">从 Codex 项目列表与 ZCode 最近会话目录读取。</span></label>
             <div class="schedule-field wide" id="sNewProjectBox" hidden>
               <label class="schedule-field">新项目名称<input id="sProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
               <label class="schedule-field" style="margin-top:10px">保存到哪个文件夹<input id="sProjectParent" list="sProjectParents" placeholder="例如 /Users/你/Documents/Codex" autocomplete="off"></label>
@@ -270,7 +270,7 @@
         <div id="sList" class="schedule-list"></div>
       </div>
     </div>
-    <div class="foot">每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度。电脑睡眠期间不会触发，唤醒后继续检查。</div>
+    <div class="foot">每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度；ZCode 任务中断后每 5 分钟自动重试（最多 8 次）。电脑睡眠期间不会触发，唤醒后继续检查。</div>
   </section>
 </div>
 
@@ -551,7 +551,7 @@ function updateTaskOptions(){
   const shown=tasks.filter(t=>taskProjectKey(t)===projectKey);
   const chosen=$('#sTask').value;
   $('#sTask').innerHTML='<option value="">'+(projectKey?'选择具体任务':'请先选择项目')+'</option>'+shown.map(t=>
-    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${esc(taskStatus[(t.turn||{}).status]||'状态未知')}</option>`).join('');
+    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(taskStatus[(t.turn||{}).status]||'状态未知')}</option>`).join('');
   if(shown.some(t=>t.id===chosen))$('#sTask').value=chosen;
   updateTaskNote();
 }
@@ -561,7 +561,7 @@ function updateTaskNote(){
   $('#sTaskNote').textContent=kind==='new'?'关联任务完成后启动新任务。':
     status==='stopped'?'该任务已超过 7 天无更新，保存后立即执行。':
     status==='completed'||status==='failed'?'该任务已结束，保存后立即执行。':
-    status==='active'?(kind==='resume'?'任务因额度中断且额度恢复后续跑。':'当前对话结束后发送下一步。'):
+    status==='active'?(kind==='resume'?(task?.agent==='zcode'?'任务因限流中断后将按固定间隔自动重试。':'任务因额度中断且额度恢复后续跑。'):'当前对话结束后发送下一步。'):
     '先选项目，再选具体任务；状态未知的任务暂不能执行。';
 }
 function setRuleFilter(filter){
@@ -574,7 +574,7 @@ function triggerText(rule){
   if(rule.trigger==='at')return '指定时间 · '+new Date(rule.run_at*1000).toLocaleString();
   if(rule.trigger==='quota'){
     if(rule.kind==='new'&&rule.quota_after)return '额度刷新后 · 预计 '+new Date(rule.quota_after*1000).toLocaleString();
-    return '额度恢复后';
+    return rule.agent==='zcode'?'中断后定时重试':'额度恢复后';
   }
   return '关联任务完成后';
 }
@@ -597,7 +597,7 @@ function renderScheduleQueue(){
     const targetName=target?(target.title||target.id).slice(0,48):r.thread_id?.slice(0,8)||'';
     const projectName=r.kind==='new'?(r.project_name||''):'';
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(label)}</span>
-      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.auto?'<span class="hint">自动监控</span>':''}
+      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.agent==='zcode'?agentTag('zcode'):''}${r.auto?'<span class="hint">自动监控</span>':''}
       ${r.status==='waiting'?`<button type="button" onclick="cancelSchedule('${esc(r.id)}')">取消</button>`:''}</div>
       <div class="prompt">${esc(r.prompt)}</div>
       <div class="meta">${esc(triggerText(r))}${projectName?' · 项目 '+esc(projectName):''}${targetName?' · 任务 '+esc(targetName):''}</div>
@@ -637,6 +637,7 @@ async function addSchedule(){
     runAt=when.toISOString();
   }
   const body={kind,trigger,thread_id:$('#sTask').value,prompt,run_at:runAt,
+    agent:kind==='new'&&$('#sProject').value.startsWith('zcode-dir:')?'zcode':'codex',
     project_mode:kind==='new'?projectMode:null,project_id:$('#sProject').value,
     project_name:$('#sProjectName').value,project_parent:$('#sProjectParent').value};
   const button=$('#sSave');button.disabled=true;button.textContent='保存中…';scheduleMessage('正在保存规则');

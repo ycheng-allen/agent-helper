@@ -13,8 +13,9 @@ Codex Helper —— 本地监控 Codex / ZCode 的模型使用、额度水位、
      因此「被偷换成了什么」无法从日志还原 —— 这正是探针存在的意义。
   2. 数据库侧（ZCode）：ZCode 自身把每轮用量写进 ~/.zcode/cli/db/db.sqlite（turn_usage /
      model_usage / session 表）。本工具以只读方式增量导入，得到模型、token、时长、TTFT、
-     错误类型与项目分布。ZCode 没有公开 CLI 与实时额度接口，因此探针、排程与
-     实时额度面板仅支持 Codex。
+     错误类型与项目分布。任务排程通过 ZCode.app 内置的 zcode.cjs 无头 CLI 执行
+     （新任务 / 指定时间 / 关联完成 / 续跑；ZCode 没有实时额度接口，中断续跑采用
+     定时重试直到恢复）。探针与实时额度面板仅支持 Codex。
   3. 探针侧（仅 Codex）：用你本地的 Codex 登录态（~/.codex/auth.json）向
      chatgpt.com/backend-api/codex/responses 发一条最小请求，读取 SSE
      response.created 事件里服务端实际派出的模型，即可即时验证「请求 X 会被派什么」。
@@ -31,7 +32,7 @@ import sys
 import threading
 import time
 import webbrowser
-from watch_scheduler import Scheduler, available_projects, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows, task_snapshots, validate_rule
+from watch_scheduler import Scheduler, all_task_snapshots, available_projects, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows, task_snapshots, validate_rule
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -614,11 +615,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "仅允许本地面板访问"}, 403)
                 return
             with g_lock:
-                tasks = g_scheduler.snapshots if g_scheduler else []
+                tasks = g_scheduler.snapshots if g_scheduler else all_task_snapshots(g_args.codex_home, g_args.zcode_home)
                 tasks = sorted(tasks, key=lambda item: (item.get("turn") or {}).get("status") != "active")
                 self._json({"rules": rule_rows(conn()),
                             "tasks": tasks,
-                            "projects": available_projects(conn(), g_args.codex_home),
+                            "projects": available_projects(conn(), g_args.codex_home, g_args.zcode_home),
                             "auto_resume": bool(conn().execute("SELECT 1 FROM schedule_settings WHERE key='auto_resume_since'").fetchone()),
                             "quota_error": g_scheduler.quota_error if g_scheduler else ""})
             return
@@ -658,11 +659,13 @@ class Handler(BaseHTTPRequestHandler):
                 if length > 30000:
                     raise ValueError("请求过大")
                 body = json.loads(self.rfile.read(length) or b"{}")
-                snapshots = task_snapshots(g_args.codex_home)
+                snapshots = all_task_snapshots(g_args.codex_home, g_args.zcode_home)
                 with g_lock:
-                    projects = available_projects(conn(), g_args.codex_home)
+                    projects = available_projects(conn(), g_args.codex_home, g_args.zcode_home)
                 rule = validate_rule(body, snapshots, g_args.codex_home, projects)
                 if rule["kind"] == "new" and rule["trigger"] == "quota":
+                    if rule.get("agent") == "zcode":
+                        raise ValueError("ZCode 暂无实时额度接口，新任务请改用指定时间或关联任务完成触发")
                     rule["quota_after"] = next_reset(read_quota())
                     if rule["quota_after"] is None:
                         raise ValueError("Codex 暂未提供下一次额度刷新时间")
@@ -806,9 +809,10 @@ def main():
                     print("    %-24s %d 轮" % (r[0], r[1]))
         return
 
-    # 排程与实时额度只支持 Codex（ZCode 无对应 CLI/接口）
-    if "codex" in g_args.agents:
-        g_scheduler = Scheduler(conn_, g_lock, g_args.codex_home, g_args.demo)
+    # 实时额度只支持 Codex；ZCode 排程采用中断后定时重试
+    if "codex" in g_args.agents or "zcode" in g_args.agents:
+        g_scheduler = Scheduler(conn_, g_lock, g_args.codex_home, g_args.demo,
+                                zcode_home=g_args.zcode_home, agents=g_args.agents)
         g_scheduler.start()
 
     server = ThreadingHTTPServer(("127.0.0.1", g_args.port), Handler)

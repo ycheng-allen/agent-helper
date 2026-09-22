@@ -59,7 +59,7 @@ Codex Helper reads local Codex session indexes and rollout logs, and imports ZCo
 
 This is a local helper, not a cloud queue. It cannot trigger work while the app or computer is asleep. Codex's internal rollout formats may change. The active probe uses a small request and only runs when you explicitly trigger it.
 
-ZCode support covers usage statistics only: ZCode has no public CLI or live-quota API, so the probe, scheduling and quota panels remain Codex-only. By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
+ZCode support covers usage statistics plus experimental scheduling. The task picker lists recent ZCode sessions and accepts follow-up/resume rules; ZCode resume retries every 5 minutes after a rate-limit interruption (up to 8 attempts) instead of relying on live quota. Note that as of ZCode 0.16.x the bundled headless CLI cannot start model sessions standalone ("Select a model before continuing" — model access is gated by the desktop app's gateway, with no `--model` flag or API-key env var), so ZCode rules can be queued now but will only execute once ZCode ships a supported headless mode; the scheduler's retry loop picks that up automatically. Point `ZCODE_BIN` at a custom CLI to override discovery. The probe and quota panels remain Codex-only. By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
 
 ## License
 

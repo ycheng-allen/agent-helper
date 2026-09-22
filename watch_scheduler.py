@@ -18,6 +18,9 @@ QUOTA_SECONDS = 10
 OVERVIEW_QUOTA_SECONDS = 30
 QUOTA_ERRORS = ("usage limit", "rate limit", "limit reached", "quota", "try again after")
 STALE_TURN_SECONDS = 7 * 86400
+ZCODE_RETRY_SECONDS = 300
+ZCODE_MAX_ATTEMPTS = 8
+ZCODE_CLI_CANDIDATES = ("/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",)
 _snapshot_cache = {}
 
 
@@ -31,6 +34,36 @@ def _state_db(codex_home):
         return db
     except sqlite3.Error:
         return None
+
+
+def _zcode_db(zcode_home):
+    path = os.path.join(zcode_home, "cli", "db", "db.sqlite")
+    if not os.path.isfile(path):
+        return None
+    try:
+        db = sqlite3.connect("file:" + path + "?mode=ro", uri=True, timeout=2)
+        db.row_factory = sqlite3.Row
+        return db
+    except sqlite3.Error:
+        return None
+
+
+def zcode_bin():
+    env = os.environ.get("ZCODE_BIN")
+    if env and os.path.isfile(env):
+        return env
+    for path in ZCODE_CLI_CANDIDATES:
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
+def zcode_cmd():
+    """Command vector to run ZCode headless; None when the app/CLI is absent."""
+    path = zcode_bin()
+    if not path:
+        return None
+    return ["node", path] if path.endswith(".cjs") else [path]
 
 
 def project_catalog(codex_home, include_mirrors=False):
@@ -50,7 +83,29 @@ def project_catalog(codex_home, include_mirrors=False):
         db.close()
 
 
-def available_projects(conn, codex_home):
+def zcode_recent_dirs(zcode_home, days=30):
+    """Distinct working directories of recent ZCode sessions, as pseudo projects."""
+    db = _zcode_db(zcode_home)
+    if db is None:
+        return []
+    cutoff = int((time.time() - days * 86400) * 1000)
+    try:
+        rows = db.execute("""SELECT DISTINCT directory FROM session
+            WHERE time_archived IS NULL AND directory!='' AND time_updated>=?
+            ORDER BY time_updated DESC LIMIT 30""", (cutoff,)).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        db.close()
+    result = []
+    for row in rows:
+        path = os.path.realpath(os.path.expanduser(row["directory"]))
+        if os.path.isdir(path) and not any(p["path"] == path for p in result):
+            result.append({"id": "zcode-dir:" + path, "name": os.path.basename(path), "path": path})
+    return result
+
+
+def available_projects(conn, codex_home, zcode_home=None):
     saved = project_catalog(codex_home)
     paths = {os.path.realpath(p["path"]) for p in saved}
     try:
@@ -61,6 +116,11 @@ def available_projects(conn, codex_home):
                 paths.add(path)
     except sqlite3.Error:
         pass
+    if zcode_home:
+        for project in zcode_recent_dirs(zcode_home):
+            if project["path"] not in paths:
+                saved.append(project)
+                paths.add(project["path"])
     return saved
 
 
@@ -259,6 +319,58 @@ def task_snapshots(codex_home, days=30):
     return sorted(result.values(), key=lambda item: item["mtime"], reverse=True)
 
 
+ZCODE_TURN_STATUS = {"running": "active", "completed": "completed", "error": "failed", "cancelled": "stopped"}
+
+
+def zcode_task_snapshots(zcode_home, days=30):
+    """Unarchived ZCode sessions mapped to the same shape as Codex task_snapshots."""
+    db = _zcode_db(zcode_home)
+    if db is None:
+        return []
+    cutoff = int((time.time() - days * 86400) * 1000)
+    try:
+        rows = db.execute("""
+            SELECT s.id, s.title, s.directory, s.time_updated,
+                   t.turn_id AS turn_id, t.status AS turn_status, t.completed_at,
+                   t.error_type AS error_type
+            FROM session s
+            LEFT JOIN turn_usage t ON t.session_id=s.id AND t.started_at=(
+                SELECT MAX(started_at) FROM turn_usage WHERE session_id=s.id)
+            WHERE s.time_archived IS NULL AND s.parent_id IS NULL AND s.time_updated>=?
+            ORDER BY s.time_updated DESC""", (cutoff,)).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        db.close()
+    result = []
+    for row in rows:
+        if not row["id"]:
+            continue
+        turn = None
+        if row["turn_id"]:
+            turn = {"id": row["turn_id"],
+                    "status": ZCODE_TURN_STATUS.get(row["turn_status"] or "", "stopped"),
+                    "error": row["error_type"] or "",
+                    "finished_ts": (row["completed_at"] or 0) / 1000 or None}
+        cwd = row["directory"] or ""
+        result.append({"id": row["id"], "title": (row["title"] or "").strip(),
+                       "cwd": cwd, "turn": turn,
+                       "mtime": (row["time_updated"] or 0) / 1000,
+                       "agent": "zcode",
+                       "project_name": os.path.basename(cwd.rstrip(os.sep)) or "未归类",
+                       "project_id": None, "project_path": cwd})
+    return result
+
+
+def all_task_snapshots(codex_home, zcode_home=None, days=30):
+    snapshots = task_snapshots(codex_home, days)
+    for item in snapshots:
+        item.setdefault("agent", "codex")
+    if zcode_home:
+        snapshots = snapshots + zcode_task_snapshots(zcode_home, days)
+    return snapshots
+
+
 def validate_rule(body, snapshots, codex_home=None, projects=None):
     kind = body.get("kind")
     trigger = body.get("trigger")
@@ -268,15 +380,24 @@ def validate_rule(body, snapshots, codex_home=None, projects=None):
             kind == "next" and trigger != "after" or
             kind == "resume" and trigger != "quota"):
         raise ValueError("任务类型与触发条件不匹配")
+    agent = "zcode" if str(body.get("agent") or "").strip() == "zcode" else "codex"
     prompt = str(body.get("prompt") or "").strip()
     if kind == "resume" and not prompt:
-        prompt = "额度已恢复。请继续完成刚才因额度限制中断的工作，先检查现有进度，避免重复操作。"
+        prompt = ("任务此前因额度或限流中断。请继续完成刚才中断的工作，"
+                  "先检查现有进度，避免重复操作。" if agent == "zcode" else
+                  "额度已恢复。请继续完成刚才因额度限制中断的工作，先检查现有进度，避免重复操作。")
     if not prompt or len(prompt) > 20000:
         raise ValueError("Prompt 需要填写，且不超过 20000 字")
     thread_id = str(body.get("thread_id") or "").strip()
     if kind != "new" or trigger == "after":
-        if thread_id not in {item["id"] for item in snapshots}:
-            raise ValueError("请选择本机已有的 Codex 任务")
+        target = next((item for item in snapshots if item["id"] == thread_id), None)
+        if target is None:
+            raise ValueError("请选择本机已有的 Codex / ZCode 任务")
+        agent = target.get("agent", "codex")
+    if agent == "zcode" and kind == "new" and trigger == "quota":
+        raise ValueError("ZCode 暂无实时额度接口，新任务请改用指定时间或关联任务完成触发")
+    if agent == "zcode" and kind == "new" and body.get("project_mode") == "create":
+        raise ValueError("ZCode 新任务请选择已存在的目录")
     project_mode = project_id = project_name = project_parent = None
     if kind == "new":
         project_mode = body.get("project_mode")
@@ -331,13 +452,13 @@ def validate_rule(body, snapshots, codex_home=None, projects=None):
     if kind in ("next", "resume") and current_status in ("completed", "failed", "stopped") and not body.get("wait_for_quota"):
         trigger = "immediate"
     return {"id": str(uuid.uuid4()), "kind": kind, "trigger": trigger, "thread_id": thread_id,
-            "cwd": cwd, "project_mode": project_mode, "project_id": project_id,
+            "agent": agent, "cwd": cwd, "project_mode": project_mode, "project_id": project_id,
             "project_name": project_name, "project_parent": project_parent,
             "prompt": prompt, "run_at": run_at, "quota_after": None,
             "after_turn_id": (target.get("turn") or {}).get("id") if target else None,
             "after_mtime": target["mtime"] if target else None,
             "status": "waiting", "auto": 0, "created_at": time.time(), "started_at": None,
-            "finished_at": None, "error": "", "output": ""}
+            "finished_at": None, "error": "", "output": "", "attempts": 0}
 
 
 def init_db(conn):
@@ -354,6 +475,10 @@ def init_db(conn):
         conn.execute("ALTER TABLE schedule_rules ADD COLUMN quota_after REAL")
     if "auto" not in cols:
         conn.execute("ALTER TABLE schedule_rules ADD COLUMN auto INTEGER DEFAULT 0")
+    if "agent" not in cols:
+        conn.execute("ALTER TABLE schedule_rules ADD COLUMN agent TEXT DEFAULT 'codex'")
+    if "attempts" not in cols:
+        conn.execute("ALTER TABLE schedule_rules ADD COLUMN attempts INTEGER DEFAULT 0")
     for name in ("project_mode", "project_id", "project_name", "project_parent"):
         if name not in cols:
             conn.execute("ALTER TABLE schedule_rules ADD COLUMN " + name + " TEXT")
@@ -370,8 +495,10 @@ def rule_rows(conn):
 
 
 class Scheduler:
-    def __init__(self, conn, lock, codex_home, demo=False):
+    def __init__(self, conn, lock, codex_home, demo=False, zcode_home=None, agents=("codex",)):
         self.conn, self.lock, self.codex_home, self.demo = conn, lock, codex_home, demo
+        self.zcode_home = zcode_home
+        self.agents = list(agents)
         self.stop_event = threading.Event()
         self.quota = None
         self.quota_error = ""
@@ -395,33 +522,35 @@ class Scheduler:
             self.stop_event.wait(TICK_SECONDS)
 
     def tick(self):
-        self.snapshots = task_snapshots(self.codex_home)
+        self.snapshots = all_task_snapshots(self.codex_home, self.zcode_home)
         with self.lock:
             setting = self.conn.execute("SELECT value FROM schedule_settings WHERE key='auto_resume_since'").fetchone()
             if setting:
                 since = float(setting[0])
                 for task in self.snapshots:
                     turn = task.get("turn") or {}
+                    err_text = (turn.get("error") or "").replace("_", " ").lower()
                     if not turn.get("finished_ts") or turn["finished_ts"] < since or turn.get("status") != "failed" or not any(
-                            x in turn.get("error", "").lower() for x in QUOTA_ERRORS):
+                            x in err_text for x in QUOTA_ERRORS):
                         continue
                     exists = self.conn.execute("""SELECT 1 FROM schedule_rules WHERE kind='resume'
                         AND thread_id=? AND after_turn_id=? LIMIT 1""", (task["id"], turn.get("id"))).fetchone()
                     if not exists:
                         rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": task["id"],
+                                              "agent": task.get("agent", "codex"),
                                               "wait_for_quota": True}, [task])
                         rule["auto"] = 1
                         self.conn.execute("""INSERT INTO schedule_rules
-                            (id,kind,trigger,thread_id,cwd,prompt,run_at,quota_after,after_turn_id,after_mtime,
+                            (id,kind,trigger,thread_id,agent,cwd,prompt,run_at,quota_after,after_turn_id,after_mtime,
                              status,auto,created_at,started_at,finished_at,error,output)
-                             VALUES(:id,:kind,:trigger,:thread_id,:cwd,:prompt,:run_at,:quota_after,:after_turn_id,:after_mtime,
+                             VALUES(:id,:kind,:trigger,:thread_id,:agent,:cwd,:prompt,:run_at,:quota_after,:after_turn_id,:after_mtime,
                                     :status,:auto,:created_at,:started_at,:finished_at,:error,:output)""", rule)
                 self.conn.commit()
             waiting = [dict(r) for r in self.conn.execute("""SELECT * FROM schedule_rules WHERE status='waiting'
                 ORDER BY COALESCE(run_at,quota_after,created_at),created_at""")]
-        needs_quota = any(r["trigger"] == "quota" for r in waiting)
+        needs_quota = any(r["trigger"] == "quota" and (r.get("agent") or "codex") != "zcode" for r in waiting)
         interval = QUOTA_SECONDS if needs_quota else OVERVIEW_QUOTA_SECONDS
-        if time.time() - self.quota_at >= interval:
+        if "codex" in self.agents and time.time() - self.quota_at >= interval:
             self.quota_at = time.time()
             try:
                 self.quota = read_quota()
@@ -440,9 +569,16 @@ class Scheduler:
             elif rule["trigger"] == "quota":
                 if rule["kind"] == "resume":
                     turn = (target or {}).get("turn") or {}
-                    due = (turn.get("status") == "failed" and
-                           any(x in turn.get("error", "").lower() for x in QUOTA_ERRORS) and
-                           quota_ready(self.quota or {}))
+                    err_ok = turn.get("status") == "failed" and any(
+                        x in (turn.get("error", "") or "").replace("_", " ").lower() for x in QUOTA_ERRORS)
+                    if (rule.get("agent") or "codex") == "zcode":
+                        # ZCode 没有实时额度接口：中断后按固定间隔重试，直到最新轮次不再报限流错误
+                        # 首次尝试立即执行；之后的重试与上一次结束保持 ZCODE_RETRY_SECONDS 间隔
+                        attempts = rule.get("attempts") or 0
+                        wait_ok = attempts == 0 or time.time() - (rule["finished_at"] or 0) >= ZCODE_RETRY_SECONDS
+                        due = err_ok and wait_ok
+                    else:
+                        due = err_ok and quota_ready(self.quota or {})
                 else:
                     due = (rule["quota_after"] is not None and time.time() >= rule["quota_after"]
                            and quota_ready(self.quota or {}))
@@ -461,15 +597,26 @@ class Scheduler:
                     "SELECT 1 FROM schedule_rules WHERE thread_id=? AND status='running' LIMIT 1",
                     (rule["thread_id"],)).fetchone():
                 return
-            updated = self.conn.execute("UPDATE schedule_rules SET status='running', started_at=? WHERE id=? AND status='waiting'",
-                                        (time.time(), rule["id"])).rowcount
+            updated = self.conn.execute("""UPDATE schedule_rules SET status='running', started_at=?,
+                attempts=COALESCE(attempts,0)+1 WHERE id=? AND status='waiting'""",
+                (time.time(), rule["id"])).rowcount
             self.conn.commit()
         if not updated:
             return
         threading.Thread(target=self._run, args=(rule,), daemon=True).start()
 
     def _run(self, rule):
-        if rule["kind"] == "new":
+        agent = rule.get("agent") or "codex"
+        if agent == "zcode":
+            base = zcode_cmd()
+            if base is None:
+                self._finish(rule, "failed", "", "未找到 ZCode CLI（需要安装 ZCode.app 或设置 ZCODE_BIN 环境变量）")
+                return
+            if rule["kind"] == "new":
+                cmd = [*base, "--prompt", rule["prompt"], "--cwd", rule["cwd"], "--json"]
+            else:
+                cmd = [*base, "--prompt", rule["prompt"], "--resume", rule["thread_id"], "--json"]
+        elif rule["kind"] == "new":
             cmd = [codex_bin(), "exec", "--json", "--skip-git-repo-check", "-C", rule["cwd"], "-"]
         else:
             cmd = [codex_bin(), "exec", "resume", rule["thread_id"], "-"]
@@ -480,10 +627,10 @@ class Scheduler:
                     self.conn.execute("INSERT OR IGNORE INTO helper_projects(id,name,path,created_at) VALUES(?,?,?,?)",
                                       ("helper-" + rule["id"], rule["project_name"], rule["cwd"], time.time()))
                     self.conn.commit()
-            proc = subprocess.run(cmd, input=rule["prompt"], text=True, cwd=rule["cwd"],
+            proc = subprocess.run(cmd, input=None if agent == "zcode" else rule["prompt"], text=True, cwd=rule["cwd"],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             task_id = rule["thread_id"]
-            if rule["kind"] == "new":
+            if rule["kind"] == "new" and agent == "codex":
                 for line in (proc.stdout or "").splitlines():
                     try:
                         event = json.loads(line)
@@ -491,11 +638,32 @@ class Scheduler:
                         continue
                     if event.get("type") == "thread.started":
                         task_id = event.get("thread_id") or task_id
+            elif rule["kind"] == "new" and agent == "zcode":
+                match = re.search(r"sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                                  proc.stdout or "")
+                task_id = match.group(0) if match else task_id
             output = task_id or ""
             error = (proc.stderr or "")[-2000:] if proc.returncode else ""
             status = "done" if proc.returncode == 0 else "failed"
         except Exception as exc:
             output, error, status = "", str(exc), "failed"
+        # ZCode 限流重试：失败回到等待队列按间隔重试，直到成功或次数用尽
+        if (status == "failed" and agent == "zcode" and rule["kind"] == "resume"
+                and rule["trigger"] == "quota"):
+            with self.lock:
+                attempts = self.conn.execute("SELECT COALESCE(attempts,0) FROM schedule_rules WHERE id=?",
+                                             (rule["id"],)).fetchone()
+                attempts = attempts[0] if attempts else 0
+                if attempts < ZCODE_MAX_ATTEMPTS:
+                    self.conn.execute("""UPDATE schedule_rules SET status='waiting', finished_at=?, error=?, output=?
+                        WHERE id=?""", (time.time(),
+                                        (error or "执行失败，稍后自动重试")[:500], output, rule["id"]))
+                    self.conn.commit()
+                    return
+                error = "重试 %d 次仍未成功，已停止：%s" % (attempts, (error or "未知错误")[:300])
+        self._finish(rule, status, error, output)
+
+    def _finish(self, rule, status, error, output):
         with self.lock:
             self.conn.execute("UPDATE schedule_rules SET status=?, finished_at=?, error=?, output=? WHERE id=?",
                               (status, time.time(), error, output, rule["id"]))
