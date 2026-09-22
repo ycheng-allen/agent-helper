@@ -535,7 +535,7 @@ def compute_cost(conn, agent, cutoff, until=""):
     UI converts per display language.
     """
     cond = {"c": cutoff, "u": until, "a": agent}
-    rows = conn.execute("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent,
+    rows = conn.execute("""SELECT COALESCE(NULLIF(served,''),'?') model, agent,
                                   COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(cached_tokens),0) tcached,
                                   COALESCE(SUM(out_tokens),0) tout, COUNT(*) turns
                            FROM turns WHERE (:c='' OR ts>=:c) AND (:u='' OR ts<:u) AND (:a='' OR agent=:a)
@@ -561,9 +561,14 @@ def compute_cost(conn, agent, cutoff, until=""):
             result["usd"] += native["usd"]
             result["usd_total"] += native["usd"]
             result["cny_total"] += native["usd"] * usd_cny
+        if p["cny"]:
+            disp_cny, disp_usd = native["cny"], native["cny"] / usd_cny
+        else:
+            disp_usd, disp_cny = native["usd"], native["usd"] * usd_cny
         result["models"].append({"model": r["model"], "agent": r["agent"], "turns": r["turns"],
                                  "tin": r["tin"], "tout": r["tout"],
-                                 "native_usd": native.get("usd"), "native_cny": native.get("cny")})
+                                 "native_usd": native.get("usd"), "native_cny": native.get("cny"),
+                                 "cost_usd": round(disp_usd, 2), "cost_cny": round(disp_cny, 2)})
     for key in ("usd", "cny", "cny_total", "usd_total"):
         result[key] = round(result[key], 2)
     result["models"].sort(key=lambda m: -(m["native_usd"] or 0) - (m["native_cny"] or 0))
@@ -741,18 +746,18 @@ def api_data(conn, days=0, agent="", win_sec=None):
     hourly = q("""SELECT substr(ts,1,13)||':00' bucket, COUNT(*) turns,
                          SUM(CASE WHEN error_kind IS NOT NULL THEN 1 ELSE 0 END) errors
                   FROM turns WHERE ts IS NOT NULL AND """ + ts_flt + " AND " + flt + " GROUP BY bucket ORDER BY bucket", cond)
-    models = q("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent, COUNT(*) turns,
+    models = q("""SELECT COALESCE(NULLIF(served,''),'?') model, agent, COUNT(*) turns,
                          COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(out_tokens),0) tout,
                          COALESCE(SUM(cached_tokens),0) tcached,
                          AVG(duration_ms) avg_dur,
                          SUM(CASE WHEN error_kind IS NOT NULL THEN 1 ELSE 0 END) errors
                   FROM turns WHERE """ + ts_flt + " AND " + flt +
                 " GROUP BY model, agent ORDER BY turns DESC", cond)
-    projects = q("""SELECT COALESCE(NULLIF(project,''),'(未知)') project, COUNT(*) turns,
+    projects = q("""SELECT COALESCE(NULLIF(project,''),'?') project, COUNT(*) turns,
                            COALESCE(SUM(in_tokens+out_tokens),0) tokens
                     FROM turns WHERE """ + ts_flt + " AND " + flt +
                  " GROUP BY project ORDER BY tokens DESC LIMIT 15", cond)
-    errors_recent = q("""SELECT ts, COALESCE(NULLIF(served,''),'(未知)') model, agent, error_kind, error_msg
+    errors_recent = q("""SELECT ts, COALESCE(NULLIF(served,''),'?') model, agent, error_kind, error_msg
                          FROM turns WHERE error_kind IS NOT NULL AND """ + ts_flt + " AND " + flt +
                          " ORDER BY ts DESC LIMIT 50", cond)
     quota_latest = q("SELECT * FROM quota ORDER BY ts DESC LIMIT 1")
@@ -765,7 +770,12 @@ def api_data(conn, days=0, agent="", win_sec=None):
     for m in models:
         m["share"] = round(m["turns"] * 100.0 / total_models, 1)
         cost = price_tokens(m["model"], m["tin"], m["tcached"], m["tout"])
-        m["cost"] = cost  # {"usd":x,"cny":y} native amounts
+        if cost:
+            _, usd_cny = load_pricing()
+            if cost.get("cny") is not None:
+                m["cost_cny"], m["cost_usd"] = cost["cny"], round(cost["cny"] / usd_cny, 2)
+            else:
+                m["cost_usd"], m["cost_cny"] = cost["usd"], round(cost["usd"] * usd_cny, 2)
     cost_month = compute_cost(conn, agent, month_cutoff())
     _, usd_cny = load_pricing()
     return {

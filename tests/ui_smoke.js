@@ -91,7 +91,7 @@ const queue = element('#sList').innerHTML;
 assert(queue.indexOf('Running task') < queue.indexOf('First task'));
 assert(queue.indexOf('First task') < queue.indexOf('Second task'));
 assert(!queue.includes('Old task'));
-assert(queue.includes('等待 #1'));
+assert(queue.includes('等待中 #1'));
 assert.strictEqual(element('#sTabCount').textContent, '3');
 vm.runInContext("setRuleFilter('history')", context);
 assert(element('#sList').innerHTML.includes('Old task'));

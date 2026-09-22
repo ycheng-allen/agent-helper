@@ -1,6 +1,6 @@
 {
   "name": "agent-helper",
-  "version": "0.7.0",
+  "version": "0.5.0",
   "description": "Local Codex/ZCode usage monitor and task scheduler",
   "main": "electron/main.js",
   "scripts": {

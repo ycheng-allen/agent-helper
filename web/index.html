@@ -203,7 +203,7 @@
       <button class="iconbtn" title="刷新当前页面" aria-label="刷新当前页面" onclick="refreshCurrentTab()">⟳</button>
     </div>
   </div>
-  <div id="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
+  <div id="demoBanner" data-i18n="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
   <nav class="tabs" role="tablist" aria-label="主导航" onkeydown="handleTabKey(event)">
     <button class="tab" id="tab-stats" role="tab" aria-controls="view-stats" aria-selected="false" onclick="setTab('stats')"><span data-i18n="stats">统计总览</span></button>
     <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')"><span data-i18n="overview">监控总览</span></button>
@@ -212,7 +212,7 @@
   </nav>
 
   <section id="view-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
-  <div class="pagehead"><h1>全局统计总览</h1>
+  <div class="pagehead"><h1 data-i18n="statHead">全局统计总览</h1>
     <div class="chips" id="statBtns"></div></div>
 
   <div class="cards" id="statCards"></div>
@@ -257,14 +257,14 @@
       <span id="pNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
-      <span class="hint">请求模型</span>
+      <span class="hint" data-i18n="reqModel">请求模型</span>
       <input class="pmodel" id="pModel" placeholder="例如 gpt-6-astra">
       <button class="pgo" id="pGo" onclick="runProbe()" data-i18n="probeGo">立即探测</button>
       <button class="pgo" onclick="clearProbe('codex')" data-i18n="clearHist">清除历史</button>
-      <span class="hint">用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度</span>
+      <span class="hint" data-i18n="probeHintC">用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度</span>
     </div>
     <div id="probeOut"></div>
-    <div class="legend"><span><i class="sq ok"></i>一致</span><span><i class="sq swap"></i>被偷换</span><span><i class="sq err"></i>失败/无结果</span><span style="margin-left:auto">最近 60 次探测</span></div>
+    <div class="legend"><span><i class="sq ok"></i><span data-i18n="legendOk">一致</span></span><span><i class="sq swap"></i><span data-i18n="legendSwap">被偷换</span></span><span><i class="sq err"></i><span data-i18n="legendErr">失败/无结果</span></span><span style="margin-left:auto" data-i18n="last60">最近 60 次探测</span></div>
     <div class="squares" id="pSquares"></div>
     <div style="overflow-x:auto"><table id="tProbe"></table></div>
   </div>
@@ -273,48 +273,48 @@
       <span id="zpNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
-      <span class="hint">请求模型</span>
+      <span class="hint" data-i18n="reqModel">请求模型</span>
       <select class="pmodel" id="zpModel" style="width:auto">
         <option value="GLM-5.3">GLM-5.3</option>
         <option value="GLM-5.3-Flash">GLM-5.3-Flash</option>
       </select>
       <button class="pgo" id="zpGo" onclick="runZProbe()" data-i18n="probeGo">立即探测</button>
       <button class="pgo" onclick="clearProbe('zcode')" data-i18n="clearHist">清除历史</button>
-      <span class="hint">用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度</span>
+      <span class="hint" data-i18n="probeHintZ">用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度</span>
     </div>
     <div id="zpOut" style="margin:8px 0;font-size:12.5px;min-height:20px"></div>
     <div style="overflow-x:auto"><table id="tZProbe"></table></div>
   </div>
 
-  <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
+  <div class="foot" data-i18n="ovFoot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
     已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.codex-model-watch/pricing.json 覆盖），非实际账单</div>
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
-    <div class="schedule-head"><div><h1 id="schedTitle">任务监控与排程</h1><p id="schedSub">让 Codex 在约定的时间或任务完成后继续工作。</p></div>
+    <div class="schedule-head"><div><h1 id="schedTitle" data-i18n="schedHead">任务监控与排程</h1><p id="schedSub">让 Codex 在约定的时间或任务完成后继续工作。</p></div>
       <div class="schedule-summary" id="sSummary"></div></div>
     <div class="schedule-layout">
       <div>
         <div class="schedule-panel" id="sAutoPanel">
-          <label class="auto-row" for="sAuto"><span class="auto-copy"><b>额度恢复后自动续跑</b>
-            <small>开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。</small></span>
+          <label class="auto-row" for="sAuto"><span class="auto-copy"><b data-i18n="autoResume">额度恢复后自动续跑</b>
+            <small data-i18n="autoResumeSub">开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。</small></span>
             <input type="checkbox" class="switch" id="sAuto" onchange="setAutoResume()" aria-label="额度恢复后自动续跑"></label>
         </div>
         <div class="schedule-panel" id="zSchedNote" hidden>
-          <span class="auto-copy"><b>ZCode 续跑说明</b>
-            <small>任务因限流中断后，续跑会等待 ZCode 额度窗口恢复（每 30 秒采样一次；额度不可读时退回每 5 分钟重试，最多 8 次）。</small></span>
+          <span class="auto-copy"><b data-i18n="zResume">ZCode 续跑说明</b>
+            <small data-i18n="zResumeSub">任务因限流中断后，续跑会等待 ZCode 额度窗口恢复（每 30 秒采样一次；额度不可读时退回每 5 分钟重试，最多 8 次）。</small></span>
         </div>
         <form class="schedule-panel" id="sForm" onsubmit="event.preventDefault();addSchedule()">
-          <h2>创建一次性规则</h2><p class="sub">选择要做的事，填写触发条件和指令。</p>
+          <h2 data-i18n="newRuleH">创建一次性规则</h2><p class="sub" data-i18n="newRuleSub">选择要做的事，填写触发条件和指令。</p>
           <div class="kind-options" role="group" aria-label="任务动作">
-            <button type="button" class="kind-option active" data-kind="new" onclick="chooseKind('new')">启动新任务</button>
-            <button type="button" class="kind-option" data-kind="next" onclick="chooseKind('next')">发送下一步</button>
-            <button type="button" class="kind-option" data-kind="resume" onclick="chooseKind('resume')">续跑任务</button>
+            <button type="button" class="kind-option active" data-kind="new" onclick="chooseKind('new')" data-i18n="startNew">启动新任务</button>
+            <button type="button" class="kind-option" data-kind="next" onclick="chooseKind('next')" data-i18n="sendNext">发送下一步</button>
+            <button type="button" class="kind-option" data-kind="resume" onclick="chooseKind('resume')" data-i18n="resumeTask">续跑任务</button>
           </div>
           <input type="hidden" id="sKind" value="new">
           <div class="schedule-grid">
             <label class="schedule-field wide" id="sTriggerBox">何时运行<select id="sTrigger" onchange="scheduleFields()">
-              <option value="at">指定时间</option><option value="quota" id="optQuota">下一次额度刷新后</option><option value="after">另一任务完成后</option></select></label>
+              <option value="at" data-i18n="optAt">指定时间</option><option value="quota" id="optQuota" data-i18n="optQuota">下一次额度刷新后</option><option value="after" data-i18n="optAfter">另一任务完成后</option></select></label>
             <div class="schedule-field wide" id="sTaskBox" hidden>
               <label class="schedule-field">项目<select id="sTaskProject" onchange="updateTaskOptions()"></select></label>
               <label class="schedule-field" style="margin-top:10px">具体任务（对话）<select id="sTask" onchange="updateTaskNote()"></select></label>
@@ -323,27 +323,27 @@
             <label class="schedule-field wide" id="sTimeBox">执行时间<input type="datetime-local" id="sTime"></label>
             <div class="schedule-field wide" id="sProjectModeBox">任务所属项目
               <div class="project-options" role="group" aria-label="项目来源">
-                <button type="button" class="kind-option active" data-project-mode="existing" onclick="chooseProjectMode('existing')">选择现有项目</button>
-                <button type="button" class="kind-option" data-project-mode="create" onclick="chooseProjectMode('create')">创建新项目</button>
+                <button type="button" class="kind-option active" data-project-mode="existing" onclick="chooseProjectMode('existing')" data-i18n="pickExisting">选择现有项目</button>
+                <button type="button" class="kind-option" data-project-mode="create" onclick="chooseProjectMode('create')" data-i18n="createNewProj">创建新项目</button>
               </div><input type="hidden" id="sProjectMode" value="existing"></div>
             <label class="schedule-field wide" id="sExistingProjectBox">已保存的本地项目<select id="sProject"></select>
               <span class="field-note">从 Codex 项目列表与 ZCode 最近会话目录读取。</span></label>
             <div class="schedule-field wide" id="sNewProjectBox" hidden>
-              <label class="schedule-field">新项目名称<input id="sProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
-              <label class="schedule-field" style="margin-top:10px">保存到哪个文件夹<input id="sProjectParent" list="sProjectParents" placeholder="例如 /Users/你/Documents/Codex" autocomplete="off"></label>
+              <label class="schedule-field"><span data-i18n="newProjName">新项目名称</span><input id="sProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
+              <label class="schedule-field" style="margin-top:10px"><span data-i18n="saveTo">保存到哪个文件夹</span><input id="sProjectParent" list="sProjectParents" placeholder="/Users/you/Documents" autocomplete="off"></label>
               <datalist id="sProjectParents"></datalist>
               <span class="field-note">规则触发时创建新目录，并在其中启动任务。</span>
             </div>
-            <label class="schedule-field wide"><span id="sPromptLabel">任务指令</span><textarea id="sPrompt" placeholder="描述希望 Codex 完成的工作"></textarea>
+            <label class="schedule-field wide"><span id="sPromptLabel">任务指令</span><textarea id="sPrompt" data-i18n-ph="sPromptPh" placeholder="描述希望 Codex 完成的工作"></textarea>
               <span class="field-note" id="sPromptNote">保存后只执行一次；应用需保持运行。</span></label>
           </div>
-          <div class="schedule-form-actions"><button type="submit" class="primary-action" id="sSave">保存规则</button>
-            <span class="hint">本地保存 · 可在执行前取消</span></div>
+          <div class="schedule-form-actions"><button type="submit" class="primary-action" id="sSave" data-i18n="saveRule">保存规则</button>
+            <span class="hint" data-i18n="localNote">本地保存 · 可在执行前取消</span></div>
           <div id="sMessage" class="schedule-message" role="status" aria-live="polite"></div>
         </form>
       </div>
       <div class="schedule-panel">
-        <h2>Schedule 队列</h2><p class="sub">等待中的规则按计划时间展示；触发条件满足后开始执行。</p>
+        <h2 data-i18n="queue">Schedule 队列</h2><p class="sub" data-i18n="queueSub">等待中的规则按计划时间展示；触发条件满足后开始执行。</p>
         <div class="schedule-filter" id="sFilters" role="group" aria-label="筛选排程规则">
           <button type="button" class="active" data-filter="active" onclick="setRuleFilter('active')" data-i18n="fActive">进行中</button>
           <button type="button" data-filter="history" onclick="setRuleFilter('history')" data-i18n="fHistory">历史</button>
@@ -362,7 +362,7 @@
     <div class="schedule-layout">
       <div>
         <form class="schedule-panel" id="spForm" onsubmit="event.preventDefault();createSprint()">
-          <h2>创建窗口</h2><p class="sub">队列在窗口开启后自动逐个（或并行）执行，窗口结束强制收工。</p>
+          <h2 data-i18n="newWindowH">创建窗口</h2><p class="sub" data-i18n="newWindowSub">队列在窗口开启后自动逐个（或并行）执行，窗口结束强制收工。</p>
           <div class="schedule-grid">
             <label class="schedule-field wide" style="flex-direction:row;gap:14px;align-items:center">
               <span style="flex:none">窗口类型</span>
@@ -406,13 +406,13 @@
               <span class="field-note">每个任务有独立的 Prompt，按顺序执行（并行时按序占用空槽）；最多 50 个。</span>
             </div>
           </div>
-          <div class="schedule-form-actions"><button type="submit" class="primary-action" id="spSave">创建窗口</button>
+          <div class="schedule-form-actions"><button type="submit" class="primary-action" id="spSave" data-i18n="newWindowH">创建窗口</button>
             <span class="hint">到点自动停止全部任务 · 可随时手动停止</span></div>
           <div id="spMessage" class="schedule-message" role="status" aria-live="polite"></div>
         </form>
       </div>
       <div class="schedule-panel">
-        <h2>窗口列表</h2><p class="sub">进行中的窗口显示队列进度；窗口结束/手动停止会终止在跑任务。</p>
+        <h2 data-i18n="winList">窗口列表</h2><p class="sub" data-i18n="winListSub">进行中的窗口显示队列进度；窗口结束/手动停止会终止在跑任务。</p>
         <div id="spList" class="schedule-list"></div>
       </div>
     </div>
@@ -446,7 +446,7 @@ const charts={};
 const $=s=>document.querySelector(s);
 const fmt=n=>(n??0).toLocaleString();
 let winSec=24*3600;
-const WINS=[['最近 1 小时',3600],['6 小时',6*3600],['24 小时',24*3600],['7 天',7*86400],['全部',0]];
+const WINS=[['w1h',3600],['w6h',6*3600],['w24h',24*3600],['w7d',7*86400],['wall',0]];
 let dLast=null;
 const C={ok:'#46c47c',fail:'#ef6a5a',swap:'#e0b64f',accent:'#5b8def',grid:'rgba(144,137,124,.12)'};
 const MCOLORS=[['astra','#5b8def'],['sol','#46c47c'],['luna','#e0b64f'],['terra','#b07fe0'],['grok','#e08b5a']];
@@ -550,7 +550,121 @@ const I18N={
   skippedN:{ch:'跳过',en:'skipped'}, stoppedN:{ch:'停止',en:'stopped'},
   noData:{ch:'本月暂无数据',en:'No data this month'},
   schedSubC:{ch:'让 Codex 在约定的时间或任务完成后继续工作。',en:'Let Codex continue work at a set time, after quota recovers, or when another task finishes.'},
-  schedSubZ:{ch:'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。',en:'Let ZCode continue work at a set time or when a task finishes; interrupted resumes wait for live quota.'},
+  schedSubZ:{ch:'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。',en:'Let ZCode continue at a set time or when a task finishes; interrupted resumes wait for live quota.'},
+  statHead:{ch:'全局统计总览',en:'Global usage stats'},
+  loading:{ch:'加载中…',en:'Loading…'}, updatedAt:{ch:'更新于',en:'Updated'},
+  noConn:{ch:'无法连接本地服务',en:'Cannot reach local service'},
+  demoBanner:{ch:'演示数据模式（--demo），并非真实使用记录',en:'Demo mode (--demo), not real usage'},
+  demoSched:{ch:'演示模式仅展示排程界面，无法保存规则。',en:'Demo mode: UI only, rules cannot be saved.'},
+  readingQuota:{ch:'正在读取账户额度…',en:'Reading account quota…'},
+  legendOk:{ch:'一致',en:'Matched'}, legendSwap:{ch:'被偷换',en:'Swapped'},
+  legendErr:{ch:'失败/无结果',en:'Failed/none'}, last60:{ch:'最近 60 次探测',en:'last 60 probes'},
+  probeHintC:{ch:'用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度',en:'Sends a minimal request with your local Codex login to read the actually served model; uses a tiny quota'},
+  probeHintZ:{ch:'用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度',en:'Runs a minimal headless ZCode request with the picked model, then reads the served model from session usage; tiny quota'},
+  probeTry:{ch:'还没有探测记录 —— 在上面输入模型名点「立即探测」试试',en:'No probes yet — pick a model above and hit Probe'},
+  ovFoot:{ch:'所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）· 已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.codex-model-watch/pricing.json 覆盖），非实际账单',
+         en:'All data stays local (~/.codex-model-watch/). Sources: ~/.codex/sessions/ logs (Codex) and ~/.zcode/cli/db/ usage DB (ZCode, read-only). Known limit: Codex normalizes swapped models into local logs, so swaps can only be verified live by the probe. Costs are list-price estimates (override in ~/.codex-model-watch/pricing.json), not real bills.'},
+  schedFoot:{ch:'每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度；ZCode 任务中断后每 5 分钟自动重试（最多 8 次）。电脑睡眠期间不会触发，唤醒后继续检查。',
+             en:'Tasks are checked every 5s; Codex live quota is read every ~10s while waiting; interrupted ZCode tasks retry every 5 minutes (max 8). Nothing fires while the computer sleeps.'},
+  sprintFoot:{ch:'每 5 秒检查一次窗口与队列；窗口结束时先 terminate、5 秒后强杀残留进程。电脑睡眠期间窗口照常按墙钟判定。',
+              en:'Windows and queues are checked every 5s; at window end tasks get SIGTERM then SIGKILL after 5s. Wall-clock based, sleeps included.'},
+  autoResumeSub:{ch:'开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。',en:'Watches running tasks; if quota kills them, resumes when quota recovers.'},
+  zResumeSub:{ch:'任务因限流中断后，续跑会等待 ZCode 额度窗口恢复（每 30 秒采样一次；额度不可读时退回每 5 分钟重试，最多 8 次）。',en:'After a rate-limit kill, resume waits for the ZCode quota window (sampled every 30s; falls back to 5-minute retries, max 8).'},
+  newRuleH:{ch:'创建一次性规则',en:'New one-shot rule'},
+  newRuleSub:{ch:'选择要做的事，填写触发条件和指令。',en:'Pick an action, set a trigger, write the prompt.'},
+  whenRun:{ch:'何时运行',en:'When'}, optAt:{ch:'指定时间',en:'At time'},
+  optQuota:{ch:'下一次额度刷新后',en:'After next quota reset'}, optAfter:{ch:'另一任务完成后',en:'After another task'},
+  taskConv:{ch:'具体任务（对话）',en:'Task (conversation)'}, notePick:{ch:'先选项目，再选具体任务。',en:'Pick a project first, then a task.'},
+  runAt:{ch:'执行时间',en:'Run at'}, projOf:{ch:'任务所属项目',en:'Project'},
+  pickExisting:{ch:'选择现有项目',en:'Existing project'}, createNewProj:{ch:'创建新项目',en:'New project'},
+  savedProjNote:{ch:'从 Codex 项目列表与 ZCode 最近会话目录读取。',en:'From Codex projects and recent ZCode session dirs.'},
+  newProjName:{ch:'新项目名称',en:'New folder name'}, saveTo:{ch:'保存到哪个文件夹',en:'Parent folder'},
+  mkdirNote:{ch:'规则触发时创建新目录，并在其中启动任务。',en:'The directory is created when the rule runs.'},
+  onceNote:{ch:'保存后只执行一次；应用需保持运行。',en:'Runs once; keep the app open.'},
+  localNote:{ch:'本地保存 · 可在执行前取消',en:'Stored locally · cancel before it runs'},
+  queueSub:{ch:'等待中的规则按计划时间展示；触发条件满足后开始执行。',en:'Waiting rules show by schedule; they run when their trigger fires.'},
+  cancel:{ch:'取消',en:'Cancel'}, autoMon:{ch:'自动监控',en:'auto'}, taskId:{ch:'任务 ID',en:'Task ID'},
+  qNoHistory:{ch:'还没有执行记录',en:'No history yet'}, qEmpty:{ch:'队列为空。创建规则后会在这里显示。',en:'Queue is empty.'},
+  noProj:{ch:'暂无',en:'—'}, noErr:{ch:'没有错误 ✓',en:'No errors ✓'},
+  pickProj:{ch:'选择项目',en:'Pick a project'}, noProjAvail:{ch:'暂无符合条件的项目',en:'No projects'},
+  pickTask:{ch:'选择具体任务',en:'Pick a task'}, pickFirst:{ch:'请先选择项目',en:'Pick a project first'},
+  taskPrefix:{ch:'任务',en:'Task'},
+  probePickFirst:{ch:'先填写要探测的请求模型',en:'Enter a model to probe'},
+  probeSendingC:{ch:'正在向 Codex 后端发送最小请求…',en:'Sending a minimal request to Codex…'},
+  probeSendingZ:{ch:'正在用 ZCode 无头 CLI 发起最小请求…（约需 10-30 秒）',en:'Running a minimal headless ZCode request… (10-30s)'},
+  probeFailMsg:{ch:'探测失败',en:'Probe failed'}, swapMsg:{ch:'⚠ 被偷换：请求',en:'⚠ Swapped: asked'},
+  matchedMsg:{ch:'✓ 一致：请求',en:'✓ Matched: asked'}, servedAs:{ch:'实际派出',en:'served'},
+  reqFail:{ch:'请求失败',en:'Request failed'},
+  clearFail:{ch:'清除失败',en:'Clear failed'}, clearedN:{ch:'已清除',en:'Cleared'}, clearedUnit:{ch:'条探针历史',en:'probe records'},
+  newWindowH:{ch:'创建窗口',en:'New window'},
+  newWindowSub:{ch:'队列在窗口开启后自动逐个（或并行）执行，窗口结束强制收工。',en:'The queue runs automatically (serial or parallel) while the window is open; everything stops at the end.'},
+  winType:{ch:'窗口类型',en:'Window type'}, dailyW:{ch:'每日窗口',en:'Daily'}, onceW:{ch:'一次性',en:'One-off'},
+  dStart:{ch:'每日开始',en:'Daily start'}, dEnd:{ch:'每日结束',en:'Daily end'},
+  crossNote:{ch:'支持跨午夜（如 22:00 → 06:00）。按本机时区。',en:'Crosses midnight (e.g. 22:00 → 06:00). Local time.'},
+  sAt:{ch:'开始时间',en:'Start'}, eAt:{ch:'结束时间',en:'End'},
+  parN:{ch:'并行数',en:'Parallelism'}, parNote:{ch:'1 = 串行；N = 最多 N 个同时跑（上限 6）。',en:'1 = serial; N = up to N at once (max 6).'},
+  taskProj:{ch:'任务项目',en:'Project'}, existDir:{ch:'现有目录',en:'Existing dir'}, newProjDir:{ch:'新建项目',en:'New project'},
+  dirNote:{ch:'队列中所有任务都在此目录执行。',en:'Every task runs in this directory.'},
+  folderName:{ch:'新文件夹名称',en:'New folder name'}, saveLoc:{ch:'保存位置',en:'Parent folder'},
+  lazyNote:{ch:'窗口首个任务启动时创建目录并登记为本地项目。',en:'Created when the first task launches; registered as a local project.'},
+  taskNote:{ch:'每个任务有独立的 Prompt，按顺序执行（并行时按序占用空槽）；最多 50 个。',en:'Each task has its own prompt and runs in order (parallel fills slots in order); max 50.'},
+  autostopNote:{ch:'到点自动停止全部任务 · 可随时手动停止',en:'Everything stops at window end · you can stop anytime'},
+  winList:{ch:'窗口列表',en:'Windows'},
+  winListSub:{ch:'进行中的窗口显示队列进度；窗口结束/手动停止会终止在跑任务。',en:'Active windows show queue progress; ending/stopping terminates running tasks.'},
+  pickDir:{ch:'选择工作目录',en:'Pick a directory'}, noDir:{ch:'暂无可用目录',en:'No directories'},
+  max50:{ch:'最多 50 个任务',en:'Max 50 tasks'},
+  noWindows:{ch:'还没有窗口。创建后会在窗口时间内自动跑队列。',en:'No windows yet. Create one and the queue runs inside the window.'},
+  spTaskPh:{ch:'这个任务的 Prompt，例如：修复登录页的样式问题并写一个回归测试',en:'Prompt for this task, e.g. fix the login page styles and add a regression test'},
+  phResume:{ch:'留空则使用默认续跑指令',en:'Leave empty for the default resume prompt'},
+  phNext:{ch:'当前对话完成后要执行的下一步',en:'The next step to run after this conversation'},
+  phNew:{ch:'描述希望 Codex 完成的工作',en:'Describe what Codex should do'},
+  lblResume:{ch:'继续指令（可留空）',en:'Resume prompt (optional)'},
+  lblNext:{ch:'下一步 Prompt',en:'Next-step prompt'}, lblNew:{ch:'任务指令',en:'Prompt'},
+  noteAssoc:{ch:'关联任务完成后启动新任务。',en:'Starts a new task after the linked task finishes.'},
+  noteStale:{ch:'该任务已超过 7 天无更新，保存后立即执行。',en:'No updates for 7+ days; runs immediately.'},
+  noteEnded:{ch:'该任务已结束，保存后立即执行。',en:'Task already ended; runs immediately.'},
+  noteRetryZ:{ch:'任务因限流中断后将按固定间隔自动重试。',en:'Retries automatically until the rate limit clears.'},
+  noteResumeQ:{ch:'任务因额度中断且额度恢复后续跑。',en:'Resumes when quota recovers.'},
+  noteNext:{ch:'当前对话结束后发送下一步。',en:'Sends the next step after the current turn.'},
+  notePickDefault:{ch:'先选项目，再选具体任务；状态未知的任务暂不能执行。',en:'Pick a project, then a task; tasks with unknown state cannot run.'},
+  stUnknown:{ch:'状态未知',en:'unknown'},
+  manualStart:{ch:'手动启动',en:'manual'},
+  w1h:{ch:'最近 1 小时',en:'1h'}, w6h:{ch:'6 小时',en:'6h'}, w24h:{ch:'24 小时',en:'24h'},
+  w7d:{ch:'7 天',en:'7d'}, wall:{ch:'全部',en:'All'},
+  remaining:{ch:'剩余',en:'left'}, unknown:{ch:'未知',en:'Unknown'},
+  prevMonth:{ch:'上月',en:'Last month'},
+  confirmClear:{ch:'确定清除',en:'Clear all'}, probeHist:{ch:'探针历史',en:'probe history'},
+  probing:{ch:'探测中…',en:'Probing…'},
+  unclassified:{ch:'未归类',en:'Unclassified'}, readFailShort:{ch:'读取失败',en:'read failed'},
+  queueFail:{ch:'排程队列暂时无法更新',en:'Schedule queue temporarily unavailable'},
+  quotaFail:{ch:'额度读取暂不可用：',en:'Quota read unavailable: '},
+  msgFillPrompt:{ch:'请填写任务指令',en:'Enter a prompt'},
+  msgPickTask:{ch:'请选择关联任务',en:'Pick a task'},
+  msgPickExistProj:{ch:'请选择现有项目',en:'Pick an existing project'},
+  msgFillNewProj:{ch:'请填写新项目名称和保存位置',en:'Enter the new project name and parent folder'},
+  msgFutureTime:{ch:'请选择将来的执行时间',en:'Pick a future time'},
+  saving:{ch:'保存中…',en:'Saving…'}, savingRule:{ch:'正在保存规则',en:'Saving rule'},
+  saveFailed:{ch:'保存失败',en:'Save failed'},
+  startedNow:{ch:'已开始执行',en:'Started'}, queued:{ch:'已加入排程队列',en:'Queued'},
+  cancelNo:{ch:'规则已开始执行，无法取消',en:'Already running, cannot cancel'},
+  cancelledOk:{ch:'已取消等待中的规则',en:'Waiting rule cancelled'},
+  autoOn:{ch:'已开启自动续跑',en:'Auto-resume on'}, autoOff:{ch:'已关闭自动续跑',en:'Auto-resume off'},
+  keepOne:{ch:'至少保留一个任务（可清空内容，保存时忽略空行）',en:'Keep at least one task (empty ones are ignored on save)'},
+  confirmStopAll:{ch:'确定中止全部窗口？在跑任务会被终止，剩余队列标记跳过。',en:'Stop all windows? Running tasks will be terminated and pending ones skipped.'},
+  stoppedAllA:{ch:'已中止',en:'Stopped'}, stoppedAllB:{ch:'个窗口',en:'windows'},
+  confirmDelSprint:{ch:'确定删除该窗口及其队列？',en:'Delete this window and its queue?'},
+  msgFillOnePrompt:{ch:'请至少填写一个任务的 Prompt',en:'Fill in at least one task prompt'},
+  msgPickDir:{ch:'请选择现有目录',en:'Pick an existing directory'},
+  msgFillNewFolder:{ch:'请填写新文件夹名称和保存位置',en:'Enter the new folder name and parent folder'},
+  msgDailyHm:{ch:'请填写每日起止时间',en:'Fill in the daily start/end time'},
+  msgOnceTime:{ch:'请填写起止时间',en:'Fill in the start/end time'},
+  creating:{ch:'创建中…',en:'Creating…'}, creatingMsg:{ch:'正在创建窗口',en:'Creating window'},
+  stoppedAllTasks:{ch:'已停止窗口内全部任务',en:'All tasks in the window stopped'},
+  dailyW2:{ch:'每日',en:'Daily'},
+  probeTry2:{ch:'还没有探测记录 —— 在上面输入模型名点「立即探测」试试',en:'No probes yet — pick a model above and hit Probe'},
+  created:{ch:'已创建',en:'Created'}, tasksQueued:{ch:'个任务入队',en:'tasks queued'},
+  confirmDelSprint:{ch:'确定删除该窗口及其队列？',en:'Delete this window and its queue?'},
+  min:{ch:'分',en:'m'}, unknownModel:{ch:'?',en:'?'},
 };
 function t(key){const e=I18N[key];return e?(LANG==='en'?e.en:e.ch):key;}
 function setLang(lang){
@@ -564,10 +678,14 @@ function setLang(lang){
 }
 function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n);});
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{el.placeholder=t(el.dataset.i18nPh);});
+  const btn=document.getElementById('langBtn');
+  if(btn)btn.textContent=LANG==='en'?'中文':'EN';
   const st=document.getElementById('statBtns');
   if(st)st.dataset.built='';
+  buildWinBtns();
 }
-const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
+const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+(LANG==='en'?'m':'分'):Math.round(ms/1000)+'s');
 const fmtMoney=(n,currency='cny')=>{
   const v=n>=100?String(Math.round(n)):n.toFixed(2);
   return (currency==='usd'?'$':'¥')+v;
@@ -584,7 +702,7 @@ function renderQuota(quota,agent='codex'){
   const live=agent==='zcode'?(quota?.zcode?.live||null):(quota?.live||null);
   const logged=quota?.latest||null, q=live||logged;
   const qEl=$('#quota');
-  if(!q){qEl.innerHTML='<span style="color:var(--dim)">正在读取 Codex 账户额度…</span>';return;}
+  if(!q){qEl.innerHTML='<span style="color:var(--dim)">'+t('readingQuota')+'</span>';return;}
   let raw={};if(!live)try{raw=JSON.parse(logged.raw||'{}');}catch(e){}
   const p=live?.primary||raw.primary||{},sec=live?.secondary||raw.secondary||{};
   const used=name=>live?(live[name]||{}).usedPercent:logged[name+'_used'];
@@ -598,7 +716,7 @@ function renderQuota(quota,agent='codex'){
     const valid=value!=null&&Number.isFinite(Number(value));
     const remaining=valid?Math.max(0,Math.min(100,100-Number(value))):0;
     const color=!valid?'var(--dim)':remaining<=10?'var(--fail)':remaining<=20?'var(--warn)':'var(--ok)';
-    return `<div class="qbar"><span class="tag">${tag} 剩余</span>`+
+    return `<div class="qbar"><span class="tag">${tag} ${t("remaining")}</span>`+
       `<span class="track"><span class="fill" style="width:${remaining}%;background:${color}"></span></span>`+
       `<span class="pct" style="color:${color}">${valid?Math.round(remaining)+'%':'?'}</span>`+
       `<span class="hint">${valid?t('usedPct')+' '+Math.round(Number(value))+'% · ':''}${reset(window)}</span></div>`;
@@ -607,7 +725,7 @@ function renderQuota(quota,agent='codex'){
   const stamp=Number.isNaN(sample.getTime())?'未知':sample.toLocaleString('zh-CN',{hour12:false});
   const source=live?(agent==='zcode'?t('srcLiveZcode'):t('srcLiveCodex'))
     :(agent==='zcode'?t('srcWait'):t('srcLog'));
-  const labels=agent==='zcode'?['5h','周']:['5h','7d'];
+  const labels=agent==='zcode'?['5h',LANG==='en'?'wk':'周']:['5h','7d'];
   qEl.innerHTML=bar(labels[0],used('primary'),p)+bar(labels[1],used('secondary'),sec)+
     `<div class="hint" style="margin-top:4px">${source} · ${t('sampled')} ${stamp}`+
     (!live&&(agent==='zcode'?quota?.zcode?.error:quota?.error)?' · '+t('readFail')+': '+esc(agent==='zcode'?quota.zcode.error:quota.error):'')+'</div>';
@@ -640,8 +758,8 @@ function render(d){
   const mk=(label,data,color,fill)=>({label,data,borderColor:color,backgroundColor:fill?color+'20':'transparent',
     borderWidth:1.6,pointRadius:0,tension:.3,fill:!!fill});
   const tCfg={type:'line',data:{labels,datasets:[
-    mk('轮次',pts.map(p=>p.turns),C.ok,true),
-    mk('错误',pts.map(p=>p.errors),C.fail)]},
+    mk(t('thTurns'),pts.map(p=>p.turns),C.ok,true),
+    mk(t('thErr'),pts.map(p=>p.errors),C.fail)]},
     options:{plugins:{legend:{labels:{boxWidth:12}}},
       scales:{x:{grid:{display:false},ticks:{maxTicksLimit:12,color:C.grid}},y:{beginAtZero:true,grid:{color:C.grid}}}}};
   charts.t?.destroy();charts.t=new Chart($('#cTrend'),tCfg);
@@ -655,48 +773,48 @@ function render(d){
       <td>${m.cost?fmtNative({native_usd:m.cost.usd,native_cny:m.cost.cny}):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
   const pr=d.projects||[];
   $('#tProj').innerHTML='<tr><th>'+t('thProj')+'</th><th>'+t('thTurns')+'</th><th>'+t('thTok')+'</th></tr>'+
-    (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">暂无</td></tr>');
+    (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">'+t('noProj')+'</td></tr>');
   const er=d.errors_recent||[];
   $('#tErr').innerHTML='<tr><th>'+t('thTime')+'</th><th>'+t('thModel')+'</th><th>'+t('thType')+'</th><th>'+t('thMsg')+'</th></tr>'+
     (er.length?er.slice(0,12).map(e=>`<tr><td>${String(e.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(e.model)}</td>
       <td><span class="badge ${e.error_kind==='capacity'||e.error_kind==='server_overloaded'?'b-bad':'b-warn'}">${e.error_kind}</span></td>
-      <td style="text-align:left;color:var(--dim);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_msg||'').replace(/"/g,'')}">${e.error_msg||''}</td></tr>`).join(''):'<tr><td style="color:var(--ok)">没有错误 ✓</td></tr>');
+      <td style="text-align:left;color:var(--dim);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_msg||'').replace(/"/g,'')}">${e.error_msg||''}</td></tr>`).join(''):'<tr><td style="color:var(--ok)">'+t('noErr')+'</td></tr>');
   const probes=d.probes||[];
   $('#pNote').textContent=`${t('swapCntSub')} ${fmt(ps.total||0)} · ${t('swapped')} ${fmt(ps.swapped||0)}`;
   $('#pSquares').innerHTML=probes.slice(0,60).reverse().map(p=>{
     const cls=p.swapped?'swap':(p.served?'ok':'err');
-    const info=`${String(p.ts).slice(5,16).replace('T',' ')} · 请求 ${p.requested} → 实际 ${p.served||p.error||'?'}`;
-    return `<span class="sq ${cls}" title="${info}"></span>`;}).join('')||'<span class="hint">还没有探测记录</span>';
+    const info=`${String(p.ts).slice(5,16).replace('T',' ')} · ${t('thReq')} ${p.requested} → ${t('thServed')} ${p.served||p.error||'?'}`;
+    return `<span class="sq ${cls}" title="${info}"></span>`;}).join('')||`<span class="hint">${t('noProbe')}</span>`;
   if(curAgent==='zcode'){
-    $('#zpNote').textContent=`共 ${fmt(ps.total||0)} 次探测 · 偷换 ${fmt(ps.swapped||0)} 次`;
+    $('#zpNote').textContent=`${t('swapCntSub')} ${fmt(ps.total||0)} · ${t('swapped')} ${fmt(ps.swapped||0)}`;
     $('#tZProbe').innerHTML='<tr><th>'+t('thTime')+'</th><th>'+t('thReq')+'</th><th>'+t('thServed')+'</th><th>'+t('thResult')+'</th><th>'+t('thLatency')+'</th></tr>'+
       (probes.length?probes.slice(0,10).map(p=>{
         const sw=p.swapped;
         return `<tr><td>${String(p.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(p.requested)}</td>
           <td style="color:${sw?'var(--fail)':'var(--ok)'}">${p.served||(p.error?'<span style="color:var(--dim)">'+(p.error||'').slice(0,40)+'</span>':'?')}</td>
-          <td>${sw?'<span class="badge b-bad">被偷换</span>':(p.served?'<span class="badge b-ok">一致</span>':'<span class="badge b-off">失败</span>')}</td>
+          <td>${sw?'<span class="badge b-bad">'+t('swapped')+'</span>':(p.served?'<span class="badge b-ok">'+t('matched')+'</span>':'<span class="badge b-off">'+t('failed')+'</span>')}</td>
           <td>${p.latency_ms?fmtDur(p.latency_ms):'—'}</td></tr>`;}).join('')
-        :'<tr><td style="color:var(--dim)">还没有探测记录</td></tr>');
+        :'<tr><td style="color:var(--dim)">'+t('noProbe')+'</td></tr>');
   }
-  $('#tProbe').innerHTML='<tr><th>时间</th><th>请求模型</th><th>实际派出</th><th>结果</th><th>耗时</th></tr>'+
+  $('#tProbe').innerHTML='<tr><th>'+t('thTime')+'</th><th>'+t('thReq')+'</th><th>'+t('thServed')+'</th><th>'+t('thResult')+'</th><th>'+t('thLatency')+'</th></tr>'+
     (probes.length?probes.slice(0,15).map(p=>{
       const sw=p.swapped;
       return `<tr><td>${String(p.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(p.requested)}</td>
         <td style="color:${sw?'var(--fail)':'var(--ok)'}">${p.served||(p.error?'<span style="color:var(--dim)">'+(p.error||'').slice(0,40)+'</span>':'?')}</td>
         <td>${sw?'<span class="badge b-bad">'+t('swapped')+'</span>':(p.served?'<span class="badge b-ok">'+t('matched')+'</span>':'<span class="badge b-off">'+(p.error?t('failed'):'?')+'</span>')}</td>
-        <td>${p.latency_ms?fmtDur(p.latency_ms):'—'}</td></tr>`;}).join(''):'<tr><td style="color:var(--dim)">还没有探测记录 —— 在上面输入模型名点「立即探测」试试</td></tr>');
+        <td>${p.latency_ms?fmtDur(p.latency_ms):'—'}</td></tr>`;}).join(''):'<tr><td style="color:var(--dim)">'+t('probeTry2')+'</td></tr>');
 }
 
 async function load(){
   let d;
   try{d=await(await fetch('/api/data?win='+winSec+'&agent='+encodeURIComponent(curAgent))).json();}
-  catch(e){$('#gen').textContent='无法连接本地服务';return;}
+  catch(e){$('#gen').textContent=t('noConn');return;}
   dLast=d;
-  $('#gen').textContent='更新于 '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · 演示数据':'');
+  $('#gen').textContent=t('updatedAt')+' '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · demo':'');
   $('#demoBanner').style.display=d.meta.demo?'block':'none';
   $('#sAuto').disabled=!!d.meta.demo;
   $('#sSave').disabled=!!d.meta.demo;
-  if(d.meta.demo)scheduleMessage('演示模式仅展示排程界面，无法保存规则。');
+  if(d.meta.demo)scheduleMessage(t('demoSched'));
   const counts={};(d.agents||[]).forEach(a=>counts[a.agent]=a.turns);
   [['codexCount','codex'],['zcodeCount','zcode']].forEach(([id,k])=>{
     const el=$('#'+id);
@@ -721,13 +839,11 @@ function applyAgentFrame(){
   $('#tab-overview').hidden=isAll();
   $('#tab-schedule').hidden=isAll();
   $('#tab-sprint').hidden=!z;
-  $('#ovTitle').textContent=z?'ZCode 监控总览':'Codex 监控总览';
-  $('#quotaTitle').textContent=z?'ZCode 额度水位':'Codex 额度水位';
+  $('#ovTitle').textContent=(z?'ZCode':'Codex')+' · '+t('overview');
+  $('#quotaTitle').textContent=(z?'ZCode':'Codex')+' · '+t('quotaTitle');
   $('#probePanel').hidden=z;
   $('#zprobePanel').hidden=!z;
-  $('#schedSub').textContent=z
-    ?'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。'
-    :'让 Codex 在约定的时间或任务完成后继续工作。';
+  $('#schedSub').textContent=z?t('schedSubZ'):t('schedSubC');
   $('#sAutoPanel').hidden=z;
   $('#zSchedNote').hidden=!z;
   $('#optQuota').hidden=z;
@@ -794,54 +910,54 @@ function setWin(sec){
   document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.w==String(sec)));
   load();
 }
-(function(){
+function buildWinBtns(){
   const el=$('#winBtns');
-  el.innerHTML=WINS.map(([lab,sec])=>`<button type="button" class="chip ${sec===winSec?'on':''}" data-w="${sec}" onclick="setWin(${sec})">${lab}</button>`).join('');
-})();
+  el.innerHTML=WINS.map(([k,sec])=>`<button type="button" class="chip ${sec===winSec?'on':''}" data-w="${sec}" onclick="setWin(${sec})">${t(k)}</button>`).join('');
+}
 
 async function clearProbe(agent){
   const label=agent==='zcode'?'ZCode':'Codex';
-  if(!confirm('确定清除 '+label+' 的全部探针历史？'))return;
+  if(!confirm(t('confirmClear')+' '+label+' '+t('probeHist')+'?'))return;
   try{
     const r=await(await fetch('/api/probe/clear',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({agent})})).json();
     const out=agent==='zcode'?$('#zpOut'):$('#probeOut');
-    if(r.error)out.innerHTML='<span style="color:var(--fail)">清除失败：'+r.error+'</span>';
-    else{out.innerHTML='<span style="color:var(--ok)">已清除 '+r.cleared+' 条探针历史</span>';load();}
-  }catch(e){$('#probeOut').innerHTML='<span style="color:var(--fail)">请求失败：'+e+'</span>';}
+    if(r.error)out.innerHTML='<span style="color:var(--fail)">'+t('clearFail')+': '+r.error+'</span>';
+    else{out.innerHTML='<span style="color:var(--ok)">'+t('clearedN')+' '+r.cleared+' '+t('clearedUnit')+'</span>';load();}
+  }catch(e){$('#probeOut').innerHTML='<span style="color:var(--fail)">'+t('reqFail')+'：'+e+'</span>';}
 }
 async function runZProbe(){
   const sel=$('#zpModel');
   const model=(sel.value||'').trim();
   const out=$('#zpOut');
-  const btn=$('#zpGo');btn.disabled=true;btn.textContent='探测中…';
-  out.innerHTML='<span style="color:var(--dim)">正在用 ZCode 无头 CLI 发起最小请求…（约需 10-30 秒）</span>';
+  const btn=$('#zpGo');btn.disabled=true;btn.textContent=t('probing');
+  out.innerHTML='<span style="color:var(--dim)">'+t('probeSendingZ')+'</span>';
   try{
     const r=await(await fetch('/api/probe',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model,agent:'zcode'})})).json();
-    if(r.error){out.innerHTML='<span style="color:var(--fail)">探测失败：'+r.error+'</span>';}
-    else if(r.swapped){out.innerHTML=`<span style="color:var(--fail)">⚠ 被偷换：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
-    else{out.innerHTML=`<span style="color:var(--ok)">✓ 一致：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
+    if(r.error){out.innerHTML='<span style="color:var(--fail)">'+t('probeFailMsg')+'：'+r.error+'</span>';}
+    else if(r.swapped){out.innerHTML=`<span style="color:var(--fail)">${t('swapMsg')} ${r.requested}，${t('servedAs')} ${r.served}（${r.latency_ms}ms）</span>`;}
+    else{out.innerHTML=`<span style="color:var(--ok)">${t('matchedMsg')} ${r.requested}，${t('servedAs')} ${r.served}（${r.latency_ms}ms）</span>`;}
     load();
-  }catch(e){out.innerHTML='<span style="color:var(--fail)">请求失败：'+e+'</span>';}
-  btn.disabled=false;btn.textContent='立即探测';
+  }catch(e){out.innerHTML='<span style="color:var(--fail)">'+t('reqFail')+'：'+e+'</span>';}
+  btn.disabled=false;btn.textContent=t('probeGo');
 }
 async function runProbe(){
   const inp=$('#pModel');
   const model=(inp.value||'').trim();
   const out=$('#probeOut');
-  if(!model){out.innerHTML='<span style="color:var(--warn)">先填写要探测的请求模型</span>';return;}
-  const btn=$('#pGo');btn.disabled=true;btn.textContent='探测中…';
-  out.innerHTML='<span style="color:var(--dim)">正在向 Codex 后端发送最小请求…</span>';
+  if(!model){out.innerHTML='<span style="color:var(--warn)">'+t('probePickFirst')+'</span>';return;}
+  const btn=$('#pGo');btn.disabled=true;btn.textContent=t('probing');
+  out.innerHTML='<span style="color:var(--dim)">'+t('probeSendingC')+'</span>';
   try{
     const r=await(await fetch('/api/probe',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model})})).json();
-    if(r.error){out.innerHTML='<span style="color:var(--fail)">探测失败：'+r.error+'</span>';}
-    else if(r.swapped){out.innerHTML=`<span style="color:var(--fail)">⚠ 被偷换：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
-    else{out.innerHTML=`<span style="color:var(--ok)">✓ 一致：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
+    if(r.error){out.innerHTML='<span style="color:var(--fail)">'+t('probeFailMsg')+'：'+r.error+'</span>';}
+    else if(r.swapped){out.innerHTML=`<span style="color:var(--fail)">${t('swapMsg')} ${r.requested}，${t('servedAs')} ${r.served}（${r.latency_ms}ms）</span>`;}
+    else{out.innerHTML=`<span style="color:var(--ok)">${t('matchedMsg')} ${r.requested}，${t('servedAs')} ${r.served}（${r.latency_ms}ms）</span>`;}
     load();
-  }catch(e){out.innerHTML='<span style="color:var(--fail)">请求失败：'+e+'</span>';}
-  btn.disabled=false;btn.textContent='立即探测';
+  }catch(e){out.innerHTML='<span style="color:var(--fail)">'+t('reqFail')+'：'+e+'</span>';}
+  btn.disabled=false;btn.textContent=t('probeGo');
 }
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -872,8 +988,8 @@ function scheduleFields(){
   $('#sProjectModeBox').hidden=kind!=='new';
   $('#sExistingProjectBox').hidden=kind!=='new'||$('#sProjectMode').value!=='existing';
   $('#sNewProjectBox').hidden=kind!=='new'||$('#sProjectMode').value!=='create';
-  $('#sPromptLabel').textContent=kind==='resume'?'继续指令（可留空）':kind==='next'?'下一步 Prompt':'任务指令';
-  $('#sPrompt').placeholder=kind==='resume'?'留空则使用默认续跑指令':kind==='next'?'当前对话完成后要执行的下一步':'描述希望 Codex 完成的工作';
+  $('#sPromptLabel').textContent=kind==='resume'?t('lblResume'):kind==='next'?t('lblNext'):t('lblNew');
+  $('#sPrompt').placeholder=kind==='resume'?t('phResume'):kind==='next'?t('phNext'):t('phNew');
   updateTaskOptions();
 }
 function updateProjectOptions(){
@@ -882,7 +998,7 @@ function updateProjectOptions(){
   if(key===projectOptionsKey)return;
   projectOptionsKey=key;
   const chosen=$('#sProject').value;
-  $('#sProject').innerHTML='<option value="">'+(projects.length?'选择现有项目':'暂无已保存的本地项目')+'</option>'+
+  $('#sProject').innerHTML='<option value="">'+(projects.length?t('pickExisting'):t('noProjAvail'))+'</option>'+
     projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.path)}</option>`).join('');
   if(projects.some(p=>p.id===chosen))$('#sProject').value=chosen;
   const parents=[...new Set(projects.map(p=>p.path.slice(0,p.path.lastIndexOf('/'))).filter(Boolean))];
@@ -903,27 +1019,27 @@ function taskProjectKey(task){return task.project_id||task.project_path||task.cw
 function updateTaskOptions(){
   const tasks=eligibleTasks();
   const projects=new Map();
-  tasks.forEach(t=>{const key=taskProjectKey(t);if(!projects.has(key))projects.set(key,t.project_name||'未归类');});
+  tasks.forEach(t=>{const key=taskProjectKey(t);if(!projects.has(key))projects.set(key,t.project_name||t('unclassified'));});
   const projectSelect=$('#sTaskProject'),previousProject=projectSelect.value;
-  projectSelect.innerHTML='<option value="">'+(projects.size?'选择项目':'暂无符合条件的项目')+'</option>'+
+  projectSelect.innerHTML='<option value="">'+(projects.size?t('pickProj'):t('noProjAvail'))+'</option>'+
     [...projects].sort((a,b)=>a[1].localeCompare(b[1],'zh')).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
   if(projects.has(previousProject))projectSelect.value=previousProject;
   const projectKey=projectSelect.value;
   const shown=tasks.filter(t=>taskProjectKey(t)===projectKey);
   const chosen=$('#sTask').value;
-  $('#sTask').innerHTML='<option value="">'+(projectKey?'选择具体任务':'请先选择项目')+'</option>'+shown.map(t=>
-    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(tsLabel((t.turn||{}).status))}</option>`).join('');
+  $('#sTask').innerHTML='<option value="">'+(projectKey?t('pickTask'):t('pickFirst'))+'</option>'+shown.map(t=>
+    `<option value="${esc(t.id)}">${esc((t.title||t('taskPrefix')+' '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(tsLabel((t.turn||{}).status))}</option>`).join('');
   if(shown.some(t=>t.id===chosen))$('#sTask').value=chosen;
   updateTaskNote();
 }
 function updateTaskNote(){
   const kind=$('#sKind').value,task=(scheduleData.tasks||[]).find(t=>t.id===$('#sTask').value);
   const status=(task?.turn||{}).status;
-  $('#sTaskNote').textContent=kind==='new'?'关联任务完成后启动新任务。':
-    status==='stopped'?'该任务已超过 7 天无更新，保存后立即执行。':
-    status==='completed'||status==='failed'?'该任务已结束，保存后立即执行。':
-    status==='active'?(kind==='resume'?(task?.agent==='zcode'?'任务因限流中断后将按固定间隔自动重试。':'任务因额度中断且额度恢复后续跑。'):'当前对话结束后发送下一步。'):
-    '先选项目，再选具体任务；状态未知的任务暂不能执行。';
+  $('#sTaskNote').textContent=kind==='new'?t('noteAssoc'):
+    status==='stopped'?t('noteStale'):
+    status==='completed'||status==='failed'?t('noteEnded'):
+    status==='active'?(kind==='resume'?(task?.agent==='zcode'?t('noteRetryZ'):t('noteResumeQ')):t('noteNext')):
+    t('notePickDefault');
 }
 function setRuleFilter(filter){
   ruleFilter=filter;
@@ -948,23 +1064,23 @@ function renderScheduleQueue(){
   const history=rules.filter(r=>r.status!=='waiting'&&r.status!=='running').sort((a,b)=>b.created_at-a.created_at);
   const shown=ruleFilter==='active'?[...running,...waiting]:ruleFilter==='history'?history:[...running,...waiting,...history];
   const position=new Map(waiting.map((r,i)=>[r.id,i+1]));
-  $('#sSummary').innerHTML=`<span><strong>${waiting.length}</strong>等待</span><span><strong>${running.length}</strong>执行中</span>`;
+  $('#sSummary').innerHTML=`<span><strong>${waiting.length}</strong>${t('waitingN')}</span><span><strong>${running.length}</strong>${t('runningN')}</span>`;
   $('#sTabCount').hidden=active.length===0;
   $('#sTabCount').textContent=String(active.length);
   $('#sList').innerHTML=shown.map(r=>{
-    const label=r.status==='waiting'?'等待 #'+position.get(r.id):ruleStatus[r.status]||r.status;
+    const label=r.status==='waiting'?t('stWaiting')+' #'+position.get(r.id):rsLabel(r.status);
     const cls=r.status==='failed'||r.status==='unknown'?'b-bad':r.status==='done'?'b-ok':r.status==='running'?'b-warn':'b-off';
     const target=(scheduleData.tasks||[]).find(t=>t.id===r.thread_id);
     const targetName=target?(target.title||target.id).slice(0,48):r.thread_id?.slice(0,8)||'';
     const projectName=r.kind==='new'?(r.project_name||''):'';
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(label)}</span>
-      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.auto?'<span class="hint">自动监控</span>':''}
-      ${r.status==='waiting'?`<button type="button" onclick="cancelSchedule('${esc(r.id)}')">取消</button>`:''}</div>
+      <b>${esc(rkLabel(r.kind))}</b>${r.auto?`<span class="hint">${t('autoMon')}</span>`:''}
+      ${r.status==='waiting'?`<button type="button" onclick="cancelSchedule('${esc(r.id)}')">${t('cancel')}</button>`:''}</div>
       <div class="prompt">${esc(r.prompt)}</div>
-      <div class="meta">${esc(triggerText(r))}${projectName?' · 项目 '+esc(projectName):''}${targetName?' · 任务 '+esc(targetName):''}</div>
+      <div class="meta">${esc(triggerText(r))}${projectName?' · '+t('thProj')+' '+esc(projectName):''}${targetName?' · '+t('taskPrefix')+' '+esc(targetName):''}</div>
       ${r.error?`<div class="meta" style="color:var(--fail)">${esc(r.error.slice(0,200))}</div>`:''}
-      ${r.output?`<div class="meta">任务 ID：${esc(r.output)}</div>`:''}</article>`;
-  }).join('')||`<div class="empty-state">${ruleFilter==='history'?'还没有执行记录':'队列为空。创建规则后会在这里显示。'}</div>`;
+      ${r.output?`<div class="meta">${t('taskId')}：${esc(r.output)}</div>`:''}</article>`;
+  }).join('')||`<div class="empty-state">${ruleFilter==='history'?t('qNoHistory'):t('qEmpty')}</div>`;
 }
 function filterScheduleData(d,agent){
   const isAgent=x=>(x.agent||'codex')===agent;
@@ -974,12 +1090,12 @@ function filterScheduleData(d,agent){
 async function loadSchedule(){
   try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error('读取失败');
     scheduleData=filterScheduleData(await response.json(),curAgent);}
-  catch(e){$('#sQuotaError').hidden=false;$('#sQuotaError').textContent='排程队列暂时无法更新';return;}
+  catch(e){$('#sQuotaError').hidden=false;$('#sQuotaError').textContent=t('queueFail');return;}
   $('#sAuto').checked=!!scheduleData.auto_resume;
   updateProjectOptions();
   updateTaskOptions();
   const warning=$('#sQuotaError');warning.hidden=!scheduleData.quota_error;
-  warning.textContent=scheduleData.quota_error?'额度读取暂不可用：'+scheduleData.quota_error:'';
+  warning.textContent=scheduleData.quota_error?t('quotaFail')+scheduleData.quota_error:'';
   renderScheduleQueue();
 }
 function scheduleMessage(message,kind=''){
@@ -988,18 +1104,18 @@ function scheduleMessage(message,kind=''){
 async function addSchedule(){
   const kind=$('#sKind').value, trigger=kind==='new'?$('#sTrigger').value:kind==='resume'?'quota':'after';
   const prompt=$('#sPrompt').value.trim();
-  if(kind!=='resume'&&!prompt){scheduleMessage('请填写任务指令','error');$('#sPrompt').focus();return;}
-  if((kind!=='new'||trigger==='after')&&!$('#sTask').value){scheduleMessage('请选择关联任务','error');$('#sTask').focus();return;}
+  if(kind!=='resume'&&!prompt){scheduleMessage(t('msgFillPrompt'),'error');$('#sPrompt').focus();return;}
+  if((kind!=='new'||trigger==='after')&&!$('#sTask').value){scheduleMessage(t('msgPickTask'),'error');$('#sTask').focus();return;}
   const projectMode=$('#sProjectMode').value;
-  if(kind==='new'&&projectMode==='existing'&&!$('#sProject').value){scheduleMessage('请选择现有项目','error');$('#sProject').focus();return;}
+  if(kind==='new'&&projectMode==='existing'&&!$('#sProject').value){scheduleMessage(t('msgPickExistProj'),'error');$('#sProject').focus();return;}
   if(kind==='new'&&projectMode==='create'&&(!$('#sProjectName').value.trim()||!$('#sProjectParent').value.trim())){
-    scheduleMessage('请填写新项目名称和保存位置','error');return;
+    scheduleMessage(t('msgFillNewProj'),'error');return;
   }
   let runAt=null;
   if(kind==='new'&&trigger==='at'){
     const value=$('#sTime').value,when=new Date(value);
     if(!value||!Number.isFinite(when.getTime())||when.getTime()<=Date.now()){
-      scheduleMessage('请选择将来的执行时间','error');$('#sTime').focus();return;
+      scheduleMessage(t('msgFutureTime'),'error');$('#sTime').focus();return;
     }
     runAt=when.toISOString();
   }
@@ -1007,24 +1123,24 @@ async function addSchedule(){
     agent:curAgent,
     project_mode:kind==='new'?projectMode:null,project_id:$('#sProject').value,
     project_name:$('#sProjectName').value,project_parent:$('#sProjectParent').value};
-  const button=$('#sSave');button.disabled=true;button.textContent='保存中…';scheduleMessage('正在保存规则');
+  const button=$('#sSave');button.disabled=true;button.textContent=t('saving');scheduleMessage(t('savingRule'));
   try{const response=await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');
-    $('#sPrompt').value='';scheduleMessage(result.rule?.trigger==='immediate'?'已开始执行':'已加入排程队列','success');setRuleFilter('active');await loadSchedule();
+    const result=await response.json();if(!response.ok)throw new Error(result.error||t('saveFailed'));
+    $('#sPrompt').value='';scheduleMessage(result.rule?.trigger==='immediate'?t('startedNow'):t('queued'),'success');setRuleFilter('active');await loadSchedule();
   }catch(e){scheduleMessage(String(e.message||e),'error');}
   finally{button.disabled=false;button.textContent='保存规则';}
 }
 async function cancelSchedule(id){
   try{const response=await fetch('/api/schedule/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
-    const result=await response.json();if(!response.ok||!result.cancelled)throw new Error(result.error||'规则已开始执行，无法取消');
-    scheduleMessage('已取消等待中的规则','success');await loadSchedule();
+    const result=await response.json();if(!response.ok||!result.cancelled)throw new Error(result.error||t('cancelNo'));
+    scheduleMessage(t('cancelledOk'),'success');await loadSchedule();
   }catch(e){scheduleMessage(String(e.message||e),'error');}
 }
 async function setAutoResume(){
   const control=$('#sAuto'),enabled=control.checked;control.disabled=true;
   try{const response=await fetch('/api/schedule/auto-resume',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({enabled})});const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');
-    scheduleMessage(enabled?'已开启自动续跑':'已关闭自动续跑','success');await loadSchedule();
+    body:JSON.stringify({enabled})});const result=await response.json();if(!response.ok)throw new Error(result.error||t('saveFailed'));
+    scheduleMessage(enabled?t('autoOn'):t('autoOff'),'success');await loadSchedule();
   }catch(e){control.checked=!enabled;scheduleMessage(String(e.message||e),'error');}
   finally{control.disabled=false;}
 }
@@ -1057,7 +1173,7 @@ function renderStats(){
   const mom=prevTotal?(monthTotal-prevTotal)/prevTotal*100:null;
   const curDisp=LANG==='en'?'usd':'cny';
   $('#statCards').innerHTML=
-    `<div class="card"><div class="k">${t('statTotal')}</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(monthTotal,curDisp)}</div><div class="s">${prevTotal?`${t('rMonth')==='本月'?'Last':'上月'} ${fmtMoney(prevTotal,curDisp)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
+    `<div class="card"><div class="k">${t('statTotal')}</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(monthTotal,curDisp)}</div><div class="s">${prevTotal?`${LANG==='en'?'Last month':'上月'} ${fmtMoney(prevTotal,curDisp)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
     `<div class="card"><div class="k">${t('statCodex')}</div><div class="v">${fmtMoney((s.per_agent.codex||{}).usd||0,'usd')}</div><div class="s">≈ ¥${((s.per_agent.codex||{}).cny_total||0).toFixed(2)} · ${t('rate')} ${s.usd_cny}</div></div>`+
     `<div class="card"><div class="k">${t('statZcode')}</div><div class="v">${fmtMoney((s.per_agent.zcode||{}).cny||0)}</div><div class="s">${LANG==='en'?'≈ $'+((s.per_agent.zcode||{}).usd_total||0).toFixed(2):'GLM 国内牌价折算'}</div></div>`+
     `<div class="card"><div class="k">${t('statTokens')}</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">${t('tokenIn')} ${fmtTok(s.totals.tokens_in)} · ${t('tokenOut')} ${fmtTok(s.totals.tokens_out)}</div></div>`+
@@ -1115,12 +1231,12 @@ function chooseSprintProjectMode(mode){
 const escAttr=esc;
 function addSprintTask(prompt=''){
   const list=$('#spTaskList');
-  if(list.children.length>=50){sprintMessage('最多 50 个任务','error');return;}
+  if(list.children.length>=50){sprintMessage(t('max50'),'error');return;}
   const row=document.createElement('div');
   row.className='sp-task';
   const promptEsc=esc(prompt);
   row.innerHTML=`<span class="idx"></span>
-    <textarea placeholder="这个任务的 Prompt，例如：修复登录页的样式问题并写一个回归测试">${promptEsc}</textarea>
+    <textarea placeholder="${escAttr(t("spTaskPh"))}">${promptEsc}</textarea>
     <span class="ops">
       <button type="button" title="上移" onclick="moveSprintTask(this,-1)">↑</button>
       <button type="button" title="下移" onclick="moveSprintTask(this,1)">↓</button>
@@ -1131,7 +1247,7 @@ function addSprintTask(prompt=''){
 }
 function removeSprintTask(btn){
   const list=$('#spTaskList');
-  if(list.children.length<=1){sprintMessage('至少保留一个任务（可清空内容，保存时忽略空行）');return;}
+  if(list.children.length<=1){sprintMessage(t('keepOne'));return;}
   btn.closest('.sp-task').remove();
   renumberSprintTasks();
 }
@@ -1160,7 +1276,7 @@ function chooseSprintKind(kind){
 function updateSprintProjects(){
   const projects=sprintData.projects||[];
   const sel=$('#spProject'),chosen=sel.value;
-  sel.innerHTML='<option value="">'+(projects.length?'选择工作目录':'暂无可用目录')+'</option>'+
+  sel.innerHTML='<option value="">'+(projects.length?t('pickDir'):t('noDir'))+'</option>'+
     projects.map(p=>`<option value="${esc(p.path)}">${esc(p.name)} · ${esc(p.path)}</option>`).join('');
   if(projects.some(p=>p.path===chosen))sel.value=chosen;
   const parents=[...new Set(projects.map(p=>p.path.slice(0,p.path.lastIndexOf('/'))).filter(Boolean))];
@@ -1219,14 +1335,14 @@ function renderSprints(){
         <button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}
       ${isActive?`<button type="button" onclick="stopSprint('${esc(s.id)}')">${t('stop')}</button>`:''}
       ${!isActive?`<button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}</div>
-      <div class="meta">${esc(winText)} · ${esc(s.cwd)}${s.manual?' · 手动启动':''}</div>
+      <div class="meta">${esc(winText)} · ${esc(s.cwd)}${s.manual?' · '+t('manualStart'):''}</div>
       ${s.status==='running'?`<div class="qbar" style="margin-top:8px"><span class="track" style="flex:1"><span class="fill" style="width:${pct}%;background:var(--accent)"></span></span><span class="pct">${pct}%</span></div>`:''}
       ${runningNow.length?`<div class="meta" style="color:var(--warn)">▸ 正在跑 ${runningNow.length} 个：${esc(runningNow.map(t=>(t.prompt||'').slice(0,30)).join(' ｜ '))}</div>`:''}
       ${pending.length&&isActive?`<div style="margin-top:8px"><div class="hint" style="margin-bottom:3px">${t('pendingQueue')}</div><div id="spq-${esc(s.id)}">${pendingRows}</div></div>`:''}
       ${cnt.skipped||cnt.stopped?`<div class="meta">${t('skippedN')} ${cnt.skipped} · ${t('stoppedN')} ${cnt.stopped} · ${t('stFailed')} ${cnt.failed} · ${t('finishedN')} ${cnt.done}</div>`:''}
       ${s.error?`<div class="meta" style="color:var(--fail)">${esc(s.error)}</div>`:''}
       </article>`;
-  }).join('')||'<div class="empty-state">还没有窗口。创建后会在窗口时间内自动跑队列。</div>';
+  }).join('')||`<div class="empty-state">${t('noWindows')}</div>`;
 }
 let spDragId=null;
 function spDragStart(ev,id){spDragId=id;if(ev.dataTransfer){ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',id);}catch(e){}}}
@@ -1257,15 +1373,15 @@ async function startSprint(id){
   }catch(e){sprintMessage(String(e.message||e),'error');}
 }
 async function stopAllSprints(){
-  if(!confirm('确定中止全部窗口？在跑任务会被终止，剩余队列标记跳过。'))return;
+  if(!confirm(t('confirmStopAll')))return;
   try{
     const r=await(await fetch('/api/sprint/stop_all',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
-    if(r.error)sprintMessage(r.error,'error');else sprintMessage('已中止 '+r.stopped+' 个窗口','success');
+    if(r.error)sprintMessage(r.error,'error');else sprintMessage(t('stoppedAllA')+' '+r.stopped+' '+t('stoppedAllB'),'success');
     loadSprint();
   }catch(e){sprintMessage(String(e.message||e),'error');}
 }
 async function deleteSprint(id){
-  if(!confirm('确定删除该窗口及其队列？'))return;
+  if(!confirm(t('confirmDelSprint')))return;
   try{
     await fetch('/api/sprint/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
     loadSprint();
@@ -1284,30 +1400,30 @@ function sprintMessage(message,kind=''){
 }
 async function createSprint(){
   const prompts=sprintTaskPrompts();
-  if(!prompts.length){sprintMessage('请至少填写一个任务的 Prompt','error');return;}
+  if(!prompts.length){sprintMessage(t('msgFillOnePrompt'),'error');return;}
   const body={kind:sprintKind,agent:'zcode',prompts,
     project_mode:spProjectMode,concurrency:parseInt($('#spConcurrency').value||'1',10)};
   if(spProjectMode==='existing'){
     body.cwd=$('#spProject').value;
-    if(!body.cwd){sprintMessage('请选择现有目录','error');$('#spProject').focus();return;}
+    if(!body.cwd){sprintMessage(t('msgPickDir'),'error');$('#spProject').focus();return;}
   }else{
     body.project_name=$('#spProjectName').value.trim();
     body.project_parent=$('#spProjectParent').value.trim();
-    if(!body.project_name||!body.project_parent){sprintMessage('请填写新文件夹名称和保存位置','error');return;}
+    if(!body.project_name||!body.project_parent){sprintMessage(t('msgFillNewFolder'),'error');return;}
   }
   if(sprintKind==='daily'){body.start_hm=$('#spStartHm').value;body.end_hm=$('#spEndHm').value;
-    if(!body.start_hm||!body.end_hm){sprintMessage('请填写每日起止时间','error');return;}}
+    if(!body.start_hm||!body.end_hm){sprintMessage(t('msgDailyHm'),'error');return;}}
   else{
-    if(!$('#spStartAt').value||!$('#spEndAt').value){sprintMessage('请填写起止时间','error');return;}
+    if(!$('#spStartAt').value||!$('#spEndAt').value){sprintMessage(t('msgOnceTime'),'error');return;}
     body.start_at=new Date($('#spStartAt').value).toISOString();
     body.end_at=new Date($('#spEndAt').value).toISOString();
   }
-  const btn=$('#spSave');btn.disabled=true;btn.textContent='创建中…';sprintMessage('正在创建窗口');
+  const btn=$('#spSave');btn.disabled=true;btn.textContent=t('creating');sprintMessage(t('creatingMsg'));
   try{
     const r=await(await fetch('/api/sprint',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)})).json();
     if(!r.error){
-      sprintMessage(`已创建：${r.task_count} 个任务入队`,'success');
+      sprintMessage(`${t('created')}：${r.task_count} ${t('tasksQueued')}`,'success');
       $('#spTaskList').innerHTML='';
       addSprintTask();
       loadSprint();
@@ -1320,7 +1436,7 @@ async function stopSprint(id){
   try{
     const r=await(await fetch('/api/sprint/stop',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id})})).json();
-    if(!r.error)sprintMessage('已停止窗口内全部任务','success');
+    if(!r.error)sprintMessage(t('stoppedAllTasks'),'success');
     else sprintMessage(r.error,'error');
     loadSprint();
   }catch(e){sprintMessage(String(e.message||e),'error');}
