@@ -717,7 +717,6 @@ def api_data(conn, days=0, agent=""):
         m["share"] = round(m["turns"] * 100.0 / total_models, 1)
         m["cost"] = price_tokens(m["model"], m["tin"], m["tcached"], m["tout"], usd_cny)
     cost_month = compute_cost(conn, agent, month_cutoff())
-    cost_month_both = compute_cost(conn, "", month_cutoff())
     return {
         "meta": {"generated_at": iso_now(), "demo": g_state["demo"],
                  "agents_enabled": (g_args.agents if g_args else ["codex", "zcode"])},
@@ -727,9 +726,7 @@ def api_data(conn, days=0, agent=""):
                     "capacity": win["capacity"] or 0,
                     "avg_duration_ms": int(win["avg_dur"] or 0)},
         "agents": agents,
-        "cost": {"month": cost_month, "month_total": cost_month_both["total_cny"],
-                 "month_usd": cost_month_both["usd"], "month_cny": cost_month_both["cny"],
-                 "usd_cny": usd_cny},
+        "cost": {"month": cost_month, "usd_cny": usd_cny},
         "hourly": hourly, "models": models, "projects": projects,
         "errors_recent": errors_recent,
         "quota": {"latest": quota_latest[0] if quota_latest else None,

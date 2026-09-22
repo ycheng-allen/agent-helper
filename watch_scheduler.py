@@ -86,12 +86,40 @@ def zcode_bin():
     return ""
 
 
+NODE_CANDIDATES = ("/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node",
+                   "/opt/local/bin/node", os.path.expanduser("~/.local/bin/node"),
+                   os.path.expanduser("~/n/bin/node"))
+
+
+def node_bin():
+    """Locate a node executable; packaged apps have a minimal PATH without homebrew."""
+    env = os.environ.get("ZCODE_NODE_BIN") or os.environ.get("NODE_BIN")
+    if env and os.path.isfile(env):
+        return env
+    found = shutil.which("node")
+    if found:
+        return found
+    candidates = list(NODE_CANDIDATES)
+    try:
+        candidates += sorted(glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin/node")),
+                             key=lambda p: os.path.getmtime(p), reverse=True)
+    except OSError:
+        pass
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return ""
+
+
 def zcode_cmd():
     """Command vector to run ZCode headless; None when the app/CLI is absent."""
     path = zcode_bin()
     if not path:
         return None
-    return ["node", path] if path.endswith(".cjs") else [path]
+    node = node_bin()
+    if not node:
+        return None
+    return [node, path] if path.endswith(".cjs") else [path]
 
 
 def helper_data_dir():
@@ -103,7 +131,10 @@ def zcode_api_key(credentials_path=None):
     path = credentials_path or os.path.join(os.path.expanduser("~"), ".zcode", "v2", "credentials.json")
     if not os.path.isfile(path):
         raise RuntimeError("未找到 ZCode 凭证文件: " + path)
-    proc = subprocess.run(["node", "-e", ZCODE_DECRYPT_NODE, path],
+    node = node_bin()
+    if not node:
+        raise RuntimeError("未找到 node 运行时（无法解密 ZCode 凭证），可设置 ZCODE_NODE_BIN 指向 node")
+    proc = subprocess.run([node, "-e", ZCODE_DECRYPT_NODE, path],
                           capture_output=True, text=True, timeout=15)
     key = (proc.stdout or "").strip()
     if proc.returncode != 0 or not key:

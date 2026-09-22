@@ -492,11 +492,13 @@ function render(d){
   const cov=d.coverage||{};
   $('#cards').innerHTML=
     `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮</div></div>`+
-    (()=>{const c=d.cost||{};const m=c.month||{};const both=c.month_total!=null;
-      const sub=both?`Codex ${fmtMoney(c.month_usd||0,'usd')} · ZCode ¥${(c.month_cny||0).toFixed(2)} · 汇率 ${c.usd_cny}`
-                    :(m.unpriced_tokens?`含未计价 ${fmtTok(m.unpriced_tokens)} tok`:'');
-      return `<div class="card"><div class="k">本月等价费用</div><div class="v">${both?fmtMoney(c.month_total,'cny'):fmtMoney(m.total_cny||0,'cny')}</div>
-        <div class="s">${sub}</div></div>`;})()+
+    (()=>{const c=d.cost||{};const m=c.month||{};
+      const codex=curAgent==='codex';
+      const big=codex?fmtMoney(m.usd||0,'usd'):fmtMoney(m.cny||0);
+      const parts=[];if(codex)parts.push(`≈ ¥${(m.cny||0).toFixed(2)}`);
+      if(m.unpriced_tokens)parts.push(`未计价 ${fmtTok(m.unpriced_tokens)} tok`);
+      return `<div class="card"><div class="k">本月等价费用</div><div class="v">${big}</div>
+        <div class="s">${parts.join(' · ')||'—'}</div></div>`;})()+
     `<div class="card"><div class="k">Token 输入</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">输出 ${fmtTok(s.tokens_out)} · 缓存命中 ${fmtTok(s.tokens_cached)}</div></div>`+
     `<div class="card"><div class="k">容量拒单</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">上游容量不足直接拒绝</div></div>`+
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+

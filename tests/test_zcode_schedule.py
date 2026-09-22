@@ -176,6 +176,22 @@ class ZcodeScheduleTest(unittest.TestCase):
         row = self.conn.execute("SELECT status FROM schedule_rules WHERE id=?", (rule["id"],)).fetchone()
         self.assertEqual("failed", row["status"])
 
+    def test_node_bin_falls_back_without_path(self):
+        import watch_scheduler as ws
+        fake_node = os.path.join(self.tmp.name, "node")
+        open(fake_node, "w").write("#!/bin/sh\n")
+        os.chmod(fake_node, 0o755)
+        with patch.dict(os.environ, {"PATH": "/usr/bin:/bin"}, clear=False), \
+             patch.object(ws, "NODE_CANDIDATES", (fake_node,)), \
+             patch("watch_scheduler.shutil.which", return_value=None):
+            self.assertEqual(fake_node, ws.node_bin())  # PATH 找不到时按候选路径兜底
+        with patch.object(ws, "ZCODE_CLI_CANDIDATES", ("/fake/zcode.cjs",)), \
+             patch.object(ws, "NODE_CANDIDATES", (fake_node,)), \
+             patch("watch_scheduler.os.path.isfile", side_effect=lambda p: p in ("/fake/zcode.cjs", fake_node)), \
+             patch("watch_scheduler.shutil.which", return_value=None):
+            cmd = ws.zcode_cmd()
+            self.assertEqual([fake_node, "/fake/zcode.cjs"], cmd)  # 命令向量用解析出的 node
+
     def test_successful_zcode_new_run(self):
         rule = validate_rule({"kind": "new", "trigger": "at", "agent": "zcode",
                               "project_mode": "existing", "project_id": "zcode-dir:" + CWD,

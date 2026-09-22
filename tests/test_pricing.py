@@ -73,6 +73,20 @@ class PricingTest(unittest.TestCase):
         both = cmw.compute_cost(conn, "", cutoff)
         self.assertEqual(0, both["unpriced_tokens"])
 
+    def test_api_data_cost_has_no_combined_fields(self):
+        import tempfile
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp
+        conn = cmw.db_connect(os.path.join(self.tmp.name, "state.db"))
+        conn.execute("""INSERT INTO turns(file,turn_id,ts,project,requested,served,agent,
+                        in_tokens,cached_tokens,out_tokens) VALUES('f','t','2026-09-10T00:00:00Z',
+                        'p','glm-5.3','glm-5.3','zcode',1000,0,2000)""")
+        conn.commit()
+        data = cmw.api_data(conn, 0, "zcode")
+        assert "month_total" not in data["cost"], "agent 空间不应返回合并费用"
+        assert data["cost"]["month"]["cny"] > 0
+
     def test_unpriced_models_counted_separately(self):
         import tempfile
         tmp = tempfile.TemporaryDirectory()
