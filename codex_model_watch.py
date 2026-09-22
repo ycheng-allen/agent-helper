@@ -963,6 +963,72 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, TypeError, RuntimeError) as exc:
                 self._json({"error": str(exc)}, 400)
             return
+        if self.path.split("?")[0] == "/api/sprint/start":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                if not g_scheduler:
+                    raise ValueError("调度器未运行")
+                g_scheduler.start_sprint(str(body.get("id") or ""),
+                                         body.get("concurrency"))
+                self._json({"started": True})
+            except (ValueError, TypeError, RuntimeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/sprint/stop_all":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            count = g_scheduler.stop_all_sprints() if g_scheduler else 0
+            self._json({"stopped": count})
+            return
+        if self.path.split("?")[0] == "/api/sprint/delete":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                if g_scheduler:
+                    g_scheduler.delete_sprint(str(body.get("id") or ""))
+                self._json({"deleted": True})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/sprint/reorder":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 20000)) or b"{}")
+                ids = body.get("task_ids")
+                if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
+                    raise ValueError("task_ids 必须是字符串数组")
+                if not g_scheduler:
+                    raise ValueError("调度器未运行")
+                g_scheduler.reorder_sprint_tasks(str(body.get("id") or ""), ids)
+                self._json({"reordered": len(ids)})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/sprint/task/delete":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                if not g_scheduler:
+                    raise ValueError("调度器未运行")
+                g_scheduler.delete_sprint_task(str(body.get("task_id") or ""))
+                self._json({"deleted": True})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
         if self.path.split("?")[0] == "/api/sprint/stop":
             if not self._local_json_request():
                 self._json({"error": "只接受本地面板的 JSON 请求"}, 403)

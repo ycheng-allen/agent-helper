@@ -146,6 +146,13 @@
   .sp-addtask{border:1px dashed var(--border2);background:transparent;color:var(--dim);
     border-radius:8px;padding:7px 14px;font:inherit;font-size:12px;cursor:pointer;width:100%}
   .sp-addtask:hover{color:var(--txt);border-color:var(--dim)}
+  .sp-qrow{display:flex;gap:7px;align-items:center;border:1px solid var(--border);border-radius:7px;
+    background:var(--card2);padding:5px 8px;margin-bottom:5px;cursor:grab;font-size:12px}
+  .sp-qrow:active{cursor:grabbing}
+  .sp-qrow .idx{flex:none;min-width:20px;text-align:center;color:var(--dim);font-size:11px}
+  .sp-qrow .sp-qprompt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sp-qrow .ops button{border:0;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;padding:2px 4px}
+  .sp-qrow .ops button:hover{color:var(--fail)}
   .empty-state{color:var(--dim);padding:25px 12px;text-align:center;font-size:12px;border:1px dashed var(--border2);border-radius:8px}
   .squares{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 14px}
   .sq{width:14px;height:14px;border-radius:3px;background:rgba(144,137,124,.15)}
@@ -349,8 +356,8 @@
   </section>
 
   <section id="view-sprint" role="tabpanel" aria-labelledby="tab-sprint" hidden>
-    <div class="schedule-head"><div><h1>免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务。适合闲时免费额度。并行数 1 即串行。</p></div>
-      <div class="schedule-summary" id="spSummary"></div></div>
+    <div class="schedule-head"><div><h1>免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。</p></div>
+      <div class="schedule-summary" id="spSummary"><button type="button" class="primary-action" id="spStopAll" onclick="stopAllSprints()" hidden style="background:var(--fail);border-color:var(--fail)">中止全部</button></div></div>
     <div class="schedule-layout">
       <div>
         <form class="schedule-panel" id="spForm" onsubmit="event.preventDefault();createSprint()">
@@ -1057,28 +1064,94 @@ function renderSprints(){
   $('#spTabCount').hidden=active.length===0;
   $('#spTabCount').textContent=String(active.length);
   const running=active.filter(s=>s.status==='running').length;
-  $('#spSummary').innerHTML=`<span><strong>${running}</strong>进行中</span><span><strong>${active.length-running}</strong>等待</span>`;
+  $('#spSummary').innerHTML=`<span><strong>${running}</strong>进行中</span><span><strong>${active.length-running}</strong>等待</span>`+
+    (active.length?`<button type="button" class="primary-action" onclick="stopAllSprints()" style="background:var(--fail);border-color:var(--fail)">中止全部</button>`:'');
   $('#spList').innerHTML=list.slice(0,10).map(s=>{
     const tasks=sprintData.tasks[s.id]||[];
     const cnt={done:0,failed:0,running:0,pending:0,stopped:0,skipped:0};
     tasks.forEach(t=>cnt[t.status]=(cnt[t.status]||0)+1);
     const total=tasks.length||1;
-    const pct=Math.round((cnt.done+cnt.failed+cnt.stopped+cnt.skipped)*100/total);
+    const finished=cnt.done+cnt.failed+cnt.stopped+cnt.skipped;
+    const pct=Math.round(finished*100/total);
     const state=sprintStateText(s);
     const cls=s.status==='stopped'?'b-bad':s.status==='done'?'b-ok':state==='进行中'?'b-warn':'b-off';
     const winText=s.kind==='daily'?`每日 ${s.start_hm} → ${s.end_hm}`:
       s.window?`${new Date(s.window[0]*1000).toLocaleString('zh-CN',{hour12:false})} → ${new Date(s.window[1]*1000).toLocaleTimeString('zh-CN',{hour12:false})}`:'';
+    const isActive=s.status==='waiting'||s.status==='running';
     const runningNow=tasks.filter(t=>t.status==='running');
+    const pending=tasks.filter(t=>t.status==='pending');
+    const pendingRows=pending.length?pending.map((t,i)=>
+      `<div class="sp-qrow" draggable="true" data-tid="${esc(t.id)}" ondragstart="spDragStart(event,'${esc(t.id)}')" ondragover="event.preventDefault()" ondrop="spDrop(event,'${esc(s.id)}','${esc(t.id)}')">
+        <span class="idx">${i+1}</span><span class="sp-qprompt" title="${esc(t.prompt)}">${esc((t.prompt||'').slice(0,60))}</span>
+        <span class="ops"><button type="button" title="删除该任务" onclick="deleteSprintTask('${esc(s.id)}','${esc(t.id)}')">✕</button></span>
+      </div>`).join('')
+      :'<div class="hint" style="margin:4px 0">队列已空</div>';
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(state)}</span>
-      <b>${esc(s.name)}</b><span class="hint">${s.concurrency>1?`并行 ${s.concurrency}`:'串行'} · ${cnt.done+cnt.failed} / ${tasks.length} 完成</span>
-      ${(s.status==='waiting'||s.status==='running')?`<button type="button" onclick="stopSprint('${esc(s.id)}')">停止</button>`:''}</div>
-      <div class="meta">${esc(winText)} · ${esc(s.cwd)}</div>
+      <b>${esc(s.name)}</b><span class="hint">${s.concurrency>1?`并行 ${s.concurrency}`:'串行'} · ${finished} / ${tasks.length} 完成</span>
+      ${s.status==='waiting'?`<span class="hint">并行</span><input type="number" min="1" max="6" value="${s.concurrency}" id="spcc-${esc(s.id)}" style="width:52px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);border-radius:6px;padding:2px 6px;font-size:11px">
+        <button type="button" class="primary-action" style="padding:3px 12px;font-size:11px" onclick="startSprint('${esc(s.id)}')">开始</button>
+        <button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">删除</button>`:''}
+      ${isActive?`<button type="button" onclick="stopSprint('${esc(s.id)}')">中止</button>`:''}
+      ${!isActive?`<button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">删除</button>`:''}</div>
+      <div class="meta">${esc(winText)} · ${esc(s.cwd)}${s.manual?' · 手动启动':''}</div>
       ${s.status==='running'?`<div class="qbar" style="margin-top:8px"><span class="track" style="flex:1"><span class="fill" style="width:${pct}%;background:var(--accent)"></span></span><span class="pct">${pct}%</span></div>`:''}
       ${runningNow.length?`<div class="meta" style="color:var(--warn)">▸ 正在跑 ${runningNow.length} 个：${esc(runningNow.map(t=>(t.prompt||'').slice(0,30)).join(' ｜ '))}</div>`:''}
+      ${pending.length&&isActive?`<div style="margin-top:8px"><div class="hint" style="margin-bottom:3px">待跑队列（可拖动排序）</div><div id="spq-${esc(s.id)}">${pendingRows}</div></div>`:''}
+      ${cnt.skipped||cnt.stopped?`<div class="meta">跳过 ${cnt.skipped} · 停止 ${cnt.stopped} · 失败 ${cnt.failed} · 完成 ${cnt.done}</div>`:''}
       ${s.error?`<div class="meta" style="color:var(--fail)">${esc(s.error)}</div>`:''}
-      ${cnt.skipped?`<div class="meta">跳过 ${cnt.skipped} · 停止 ${cnt.stopped} · 失败 ${cnt.failed}</div>`:''}
       </article>`;
   }).join('')||'<div class="empty-state">还没有窗口。创建后会在窗口时间内自动跑队列。</div>';
+}
+let spDragId=null;
+function spDragStart(ev,id){spDragId=id;if(ev.dataTransfer){ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',id);}catch(e){}}}
+function spDrop(ev,sprintId,targetId){
+  ev.preventDefault();
+  const id=spDragId||(ev.dataTransfer&&ev.dataTransfer.getData('text/plain'));
+  spDragId=null;
+  if(!id||id===targetId)return;
+  const container=document.getElementById('spq-'+sprintId);
+  if(!container)return;
+  const rows=[...container.querySelectorAll('.sp-qrow')];
+  const dragRow=rows.find(r=>r.dataset.tid===id);
+  const targetRow=rows.find(r=>r.dataset.tid===targetId);
+  if(!dragRow||!targetRow)return;
+  container.insertBefore(dragRow,targetRow);
+  const order=[...container.querySelectorAll('.sp-qrow')].map(r=>r.dataset.tid);
+  fetch('/api/sprint/reorder',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:sprintId,task_ids:order})}).then(()=>loadSprint()).catch(()=>loadSprint());
+}
+async function startSprint(id){
+  const input=document.getElementById('spcc-'+id);
+  const concurrency=input?parseInt(input.value||'1',10):null;
+  try{
+    const r=await(await fetch('/api/sprint/start',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id,concurrency})})).json();
+    if(r.error)sprintMessage(r.error,'error');
+    loadSprint();
+  }catch(e){sprintMessage(String(e.message||e),'error');}
+}
+async function stopAllSprints(){
+  if(!confirm('确定中止全部窗口？在跑任务会被终止，剩余队列标记跳过。'))return;
+  try{
+    const r=await(await fetch('/api/sprint/stop_all',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+    if(r.error)sprintMessage(r.error,'error');else sprintMessage('已中止 '+r.stopped+' 个窗口','success');
+    loadSprint();
+  }catch(e){sprintMessage(String(e.message||e),'error');}
+}
+async function deleteSprint(id){
+  if(!confirm('确定删除该窗口及其队列？'))return;
+  try{
+    await fetch('/api/sprint/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    loadSprint();
+  }catch(e){sprintMessage(String(e.message||e),'error');}
+}
+async function deleteSprintTask(sprintId,taskId){
+  try{
+    const r=await(await fetch('/api/sprint/task/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({task_id:taskId})})).json();
+    if(r.error)sprintMessage(r.error,'error');
+    loadSprint();
+  }catch(e){sprintMessage(String(e.message||e),'error');}
 }
 function sprintMessage(message,kind=''){
   const el=$('#spMessage');el.textContent=message;el.className='schedule-message'+(kind?' '+kind:'');

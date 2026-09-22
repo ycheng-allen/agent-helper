@@ -278,5 +278,91 @@ class SprintCreateProjectTest(unittest.TestCase):
         self.assertEqual(1, row)
 
 
+class SprintControlTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.conn = sqlite3.connect(":memory:", check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
+        init_db(self.conn)
+        self.scheduler = Scheduler(self.conn, __import__("threading").Lock(),
+                                   os.path.join(self.tmp.name, "cx"),
+                                   zcode_home=os.path.join(self.tmp.name, "zc"), agents=["zcode"])
+        self.procs = []
+
+    def fake_popen(self, returncode=0, delay=0, stdout="sess_11111111-2222-3333-4444-555555555555"):
+        def factory(cmd, **kwargs):
+            proc = FakeProc(returncode=returncode, delay=delay, stdout=stdout)
+            self.procs.append(proc)
+            return proc
+        return factory
+
+    def run_sprint(self, prompts=("a", "b"), window=(None, None), concurrency=1):
+        sp = {"id": "spX", "name": "t", "agent": "zcode", "kind": "once",
+              "start_hm": None, "end_hm": None,
+              "start_at": window[0] if window[0] is not None else (time.time() - 10),
+              "end_at": window[1] if window[1] is not None else (time.time() + 3600),
+              "cwd": self.tmp.name, "concurrency": concurrency,
+              "project_mode": None, "project_name": None, "project_parent": None,
+              "status": "waiting", "created_at": time.time(), "stopped_at": None}
+        tasks = [{"id": "t%d" % i, "sprint_id": "spX", "prompt": p, "position": i,
+                  "status": "pending", "session_id": None, "error": None, "output": None,
+                  "started_at": None, "finished_at": None, "attempts": 0}
+                 for i, p in enumerate(prompts)]
+        insert_sprint(self.conn, sp, tasks)
+        return sp, tasks
+
+    def launch_mocks(self, delay=0):
+        return patch("watch_scheduler.zcode_cmd", return_value=["node", "/fake/zcode.cjs"]), \
+               patch("watch_scheduler.zcode_env", return_value=({"Z": "1"}, "")), \
+               patch("watch_scheduler.subprocess.Popen", side_effect=self.fake_popen(delay=delay))
+
+    def test_start_manual_runs_outside_window(self):
+        past_end = time.time() - 100  # 窗口早已结束
+        self.run_sprint(window=(past_end - 100, past_end))
+        m1, m2, m3 = self.launch_mocks()
+        with m1, m2, m3:
+            self.scheduler.start_sprint("spX", 2)
+            row = self.conn.execute("SELECT status, manual, concurrency FROM sprints WHERE id='spX'").fetchone()
+            deadline = time.time() + 3
+            while self.scheduler.sprint_procs and time.time() < deadline:
+                time.sleep(0.05)
+            time.sleep(0.2)
+        self.assertEqual("running", row["status"])
+        self.assertEqual(1, row["manual"])
+        self.assertEqual(2, row["concurrency"])
+        statuses = [r[0] for r in self.conn.execute("SELECT status FROM sprint_tasks ORDER BY position")]
+        self.assertEqual(["done", "done"], statuses)
+
+    def test_stop_all(self):
+        self.run_sprint()
+        m1, m2, m3 = self.launch_mocks(delay=5)
+        with m1, m2, m3:
+            self.scheduler.start_sprint("spX")
+            n = self.scheduler.stop_all_sprints()
+        self.assertEqual(1, n)
+        self.assertEqual("stopped", self.conn.execute("SELECT status FROM sprints WHERE id='spX'").fetchone()[0])
+
+    def test_reorder_pending_only(self):
+        self.run_sprint(prompts=("a", "b"))
+        self.scheduler.reorder_sprint_tasks("spX", ["t1", "t0"])
+        order = [r[0] for r in self.conn.execute(
+            "SELECT id FROM sprint_tasks WHERE status='pending' ORDER BY position")]
+        self.assertEqual(["t1", "t0"], order)
+        with self.assertRaises(ValueError):
+            self.scheduler.reorder_sprint_tasks("spX", ["t0"])  # 数量不符
+
+    def test_delete_task_and_sprint(self):
+        self.run_sprint(prompts=("a", "b"))
+        self.scheduler.delete_sprint_task("t0")
+        self.assertEqual(["t1"], [r[0] for r in self.conn.execute(
+            "SELECT id FROM sprint_tasks WHERE status='pending' ORDER BY position")])
+        with self.assertRaises(ValueError):
+            self.scheduler.delete_sprint_task("nope")
+        self.scheduler.delete_sprint("spX")
+        self.assertIsNone(self.conn.execute("SELECT id FROM sprints WHERE id='spX'").fetchone())
+        self.assertEqual(0, self.conn.execute("SELECT COUNT(*) FROM sprint_tasks").fetchone()[0])
+
+
 if __name__ == "__main__":
     unittest.main()

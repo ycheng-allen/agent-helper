@@ -634,9 +634,10 @@ def init_db(conn):
         project_mode TEXT, project_name TEXT, project_parent TEXT,
         status TEXT DEFAULT 'waiting', created_at REAL, stopped_at REAL)""")
     sprint_cols = {row[1] for row in conn.execute("PRAGMA table_info(sprints)")}
-    for col in ("project_mode", "project_name", "project_parent"):
+    for col in ("project_mode", "project_name", "project_parent", "manual"):
         if col not in sprint_cols:
-            conn.execute("ALTER TABLE sprints ADD COLUMN " + col + " TEXT")
+            conn.execute("ALTER TABLE sprints ADD COLUMN " + col +
+                         (" INTEGER DEFAULT 0" if col == "manual" else " TEXT"))
     conn.execute("""CREATE TABLE IF NOT EXISTS sprint_tasks(
         id TEXT PRIMARY KEY, sprint_id TEXT, prompt TEXT, position INTEGER,
         status TEXT DEFAULT 'pending', session_id TEXT, error TEXT, output TEXT,
@@ -893,6 +894,14 @@ class Scheduler:
             sprints = [dict(r) for r in self.conn.execute(
                 "SELECT * FROM sprints WHERE status IN ('waiting','running')")]
         for sp in sprints:
+            if sp.get("manual"):
+                # 手动启动：无视窗口，跑完队列即收工
+                if sp["status"] == "waiting":
+                    with self.lock:
+                        self.conn.execute("UPDATE sprints SET status='running' WHERE id=?", (sp["id"],))
+                        self.conn.commit()
+                self.fill_sprint_slots(sp)
+                continue
             a, b = sprint_window(sp, now)
             if now < a:
                 continue
@@ -1045,6 +1054,68 @@ class Scheduler:
 
     def stop_sprint(self, sprint_id):
         self.finish_sprint(sprint_id, "stopped", "手动停止")
+
+    def start_sprint(self, sprint_id, concurrency=None):
+        """Manually start a waiting sprint (ignores its window) or retune a running one."""
+        if concurrency is not None:
+            concurrency = max(1, min(6, int(concurrency)))
+        with self.lock:
+            row = self.conn.execute("SELECT status FROM sprints WHERE id=?", (sprint_id,)).fetchone()
+            if not row:
+                raise ValueError("窗口不存在")
+            if row["status"] not in ("waiting", "running"):
+                raise ValueError("该窗口已结束，不能启动")
+            if concurrency:
+                self.conn.execute("UPDATE sprints SET concurrency=? WHERE id=?", (concurrency, sprint_id))
+            if row["status"] == "waiting":
+                self.conn.execute("UPDATE sprints SET manual=1, status='running' WHERE id=?", (sprint_id,))
+            self.conn.commit()
+        self.tick_sprints()
+
+    def stop_all_sprints(self):
+        with self.lock:
+            ids = [r[0] for r in self.conn.execute(
+                "SELECT id FROM sprints WHERE status IN ('waiting','running')")]
+        for sid in ids:
+            self.finish_sprint(sid, "stopped", "手动全部中止")
+        return len(ids)
+
+    def delete_sprint(self, sprint_id):
+        if self.conn is None:
+            return
+        with self.lock:
+            row = self.conn.execute("SELECT status FROM sprints WHERE id=?", (sprint_id,)).fetchone()
+            if not row:
+                return
+            running = row["status"] == "running"
+        if running:
+            self.finish_sprint(sprint_id, "stopped", "删除前自动停止")
+        with self.lock:
+            self.conn.execute("DELETE FROM sprint_tasks WHERE sprint_id=?", (sprint_id,))
+            self.conn.execute("DELETE FROM sprints WHERE id=?", (sprint_id,))
+            self.conn.commit()
+
+    def reorder_sprint_tasks(self, sprint_id, task_ids):
+        """Persist a new order for the pending tasks of a sprint."""
+        with self.lock:
+            owned = {r[0] for r in self.conn.execute(
+                "SELECT id FROM sprint_tasks WHERE sprint_id=? AND status='pending'", (sprint_id,))}
+            if not set(task_ids) <= owned or len(task_ids) != len(owned):
+                raise ValueError("任务清单与待跑队列不一致（进行中/已完成的任务不可拖动）")
+            for pos, tid in enumerate(task_ids):
+                self.conn.execute("UPDATE sprint_tasks SET position=? WHERE id=?", (pos, tid))
+            self.conn.commit()
+
+    def delete_sprint_task(self, task_id):
+        with self.lock:
+            row = self.conn.execute("SELECT sprint_id, status FROM sprint_tasks WHERE id=?",
+                                    (task_id,)).fetchone()
+            if not row:
+                raise ValueError("任务不存在")
+            if row["status"] != "pending":
+                raise ValueError("只能删除待跑的任务")
+            self.conn.execute("DELETE FROM sprint_tasks WHERE id=?", (task_id,))
+            self.conn.commit()
 
     def dispatch(self, rule):
         with self.lock:
