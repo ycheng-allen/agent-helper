@@ -252,6 +252,7 @@
       <span class="hint">请求模型</span>
       <input class="pmodel" id="pModel" placeholder="例如 gpt-6-astra">
       <button class="pgo" id="pGo" onclick="runProbe()">立即探测</button>
+      <button class="pgo" onclick="clearProbe('codex')">清除历史</button>
       <span class="hint">用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度</span>
     </div>
     <div id="probeOut"></div>
@@ -270,6 +271,7 @@
         <option value="GLM-5.3-Flash">GLM-5.3-Flash</option>
       </select>
       <button class="pgo" id="zpGo" onclick="runZProbe()">立即探测</button>
+      <button class="pgo" onclick="clearProbe('zcode')">清除历史</button>
       <span class="hint">用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度</span>
     </div>
     <div id="zpOut" style="margin:8px 0;font-size:12.5px;min-height:20px"></div>
@@ -671,6 +673,17 @@ function setWin(sec){
   el.innerHTML=WINS.map(([lab,sec])=>`<button type="button" class="chip ${sec===winSec?'on':''}" data-w="${sec}" onclick="setWin(${sec})">${lab}</button>`).join('');
 })();
 
+async function clearProbe(agent){
+  const label=agent==='zcode'?'ZCode':'Codex';
+  if(!confirm('确定清除 '+label+' 的全部探针历史？'))return;
+  try{
+    const r=await(await fetch('/api/probe/clear',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({agent})})).json();
+    const out=agent==='zcode'?$('#zpOut'):$('#probeOut');
+    if(r.error)out.innerHTML='<span style="color:var(--fail)">清除失败：'+r.error+'</span>';
+    else{out.innerHTML='<span style="color:var(--ok)">已清除 '+r.cleared+' 条探针历史</span>';load();}
+  }catch(e){$('#probeOut').innerHTML='<span style="color:var(--fail)">请求失败：'+e+'</span>';}
+}
 async function runZProbe(){
   const sel=$('#zpModel');
   const model=(sel.value||'').trim();

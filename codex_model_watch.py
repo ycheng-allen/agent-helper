@@ -662,6 +662,15 @@ def run_zcode_probe(model, timeout=180):
             "latency_ms": latency, "error": error}
 
 
+def clear_probes(conn, agent):
+    """Delete probe history for one agent ('codex'|'zcode'); returns rowcount."""
+    if agent not in ("codex", "zcode"):
+        raise ValueError("agent 必须是 codex 或 zcode")
+    cur = conn.execute("DELETE FROM probes WHERE agent=?", (agent,))
+    conn.commit()
+    return cur.rowcount
+
+
 # ---------------------------------------------------------------- 聚合输出
 
 def api_data(conn, days=0, agent="", win_sec=None):
@@ -1047,6 +1056,19 @@ class Handler(BaseHTTPRequestHandler):
                                              (str(body.get("id") or ""),)).rowcount
                     conn().commit()
                 self._json({"cancelled": bool(changed)})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/probe/clear":
+            if not self._local_json_request() or g_state["demo"]:
+                self._json({"error": "只接受本地面板的真实模式请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                with g_lock:
+                    deleted = clear_probes(conn(), str(body.get("agent") or ""))
+                self._json({"cleared": deleted})
             except (ValueError, TypeError) as exc:
                 self._json({"error": str(exc)}, 400)
             return

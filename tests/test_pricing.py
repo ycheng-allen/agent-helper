@@ -87,6 +87,23 @@ class PricingTest(unittest.TestCase):
         assert "month_total" not in data["cost"], "agent 空间不应返回合并费用"
         assert data["cost"]["month"]["cny"] > 0
 
+    def test_clear_probes_filters_by_agent(self):
+        import tempfile
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        conn = cmw.db_connect(os.path.join(tmp.name, "state.db"))
+        for agent in ("codex", "zcode"):
+            conn.execute("INSERT INTO probes(ts,requested,served,swapped,latency_ms,safety_header,error,agent) "
+                         "VALUES(?,?,?,?,?,?,?,?)",
+                         ("2026-09-22T00:00:0%sZ" % (0 if agent == "codex" else 5),
+                          "m", "m", 0, 1, "", None, agent))
+        conn.commit()
+        self.assertEqual(1, cmw.clear_probes(conn, "zcode"))
+        self.assertEqual(1, cmw.clear_probes(conn, "codex"))
+        self.assertEqual(0, cmw.clear_probes(conn, "codex"))
+        with self.assertRaises(ValueError):
+            cmw.clear_probes(conn, "bogus")
+
     def test_unpriced_models_counted_separately(self):
         import tempfile
         tmp = tempfile.TemporaryDirectory()
