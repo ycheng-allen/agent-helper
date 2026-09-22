@@ -561,7 +561,7 @@ function render(d){
 
 async function load(){
   let d;
-  try{d=await(await fetch('/api/data?days='+Math.ceil(winSec/86400)+'&agent='+encodeURIComponent(curAgent))).json();}
+  try{d=await(await fetch('/api/data?win='+winSec+'&agent='+encodeURIComponent(curAgent))).json();}
   catch(e){$('#gen').textContent='无法连接本地服务';return;}
   dLast=d;
   $('#gen').textContent='更新于 '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · 演示数据':'');

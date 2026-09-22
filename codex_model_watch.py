@@ -664,9 +664,12 @@ def run_zcode_probe(model, timeout=180):
 
 # ---------------------------------------------------------------- 聚合输出
 
-def api_data(conn, days=0, agent=""):
+def api_data(conn, days=0, agent="", win_sec=None):
     cutoff = ""
-    if days and days > 0:
+    if win_sec is not None and win_sec > 0:
+        cutoff = (datetime.now(timezone.utc).replace(tzinfo=None)
+                  - timedelta(seconds=win_sec)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    elif days and days > 0:
         cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     cond = {"c": cutoff, "a": agent}
     flt = "(:a='' OR agent=:a)"
@@ -690,7 +693,7 @@ def api_data(conn, days=0, agent=""):
                   FROM turns WHERE """ + ts_flt + " GROUP BY agent ORDER BY turns DESC", {"c": cutoff})
     hourly = q("""SELECT substr(ts,1,13)||':00' bucket, COUNT(*) turns,
                          SUM(CASE WHEN error_kind IS NOT NULL THEN 1 ELSE 0 END) errors
-                  FROM turns WHERE ts IS NOT NULL AND """ + flt + " GROUP BY bucket ORDER BY bucket", cond)
+                  FROM turns WHERE ts IS NOT NULL AND """ + ts_flt + " AND " + flt + " GROUP BY bucket ORDER BY bucket", cond)
     models = q("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent, COUNT(*) turns,
                          COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(out_tokens),0) tout,
                          COALESCE(SUM(cached_tokens),0) tcached,
@@ -861,6 +864,12 @@ class Handler(BaseHTTPRequestHandler):
                 days = int((qs.get("days") or ["0"])[0])
             except ValueError:
                 days = 0
+            win_sec = None
+            if qs.get("win"):
+                try:
+                    win_sec = max(0, int(qs["win"][0]))
+                except ValueError:
+                    win_sec = None
             agent = (qs.get("agent") or [""])[0]
             if agent not in ("", "codex", "zcode"):
                 agent = ""
@@ -871,7 +880,7 @@ class Handler(BaseHTTPRequestHandler):
                     if "zcode" in g_args.agents:
                         import_zcode(conn(), g_args.zcode_home, g_args.max_age_days)
                     g_last_scan = time.time()
-                self._json(api_data(conn(), days, agent))
+                self._json(api_data(conn(), days, agent, win_sec))
             return
         if path == "/api/schedule":
             if self.headers.get("Host", "") != "127.0.0.1:%d" % g_args.port:
