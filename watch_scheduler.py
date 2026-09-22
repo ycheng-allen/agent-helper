@@ -1,5 +1,6 @@
 """Local, opt-in Codex task scheduling. No prompts are sent without a saved rule."""
 import glob
+import getpass
 import json
 import os
 import re
@@ -21,7 +22,34 @@ STALE_TURN_SECONDS = 7 * 86400
 ZCODE_RETRY_SECONDS = 300
 ZCODE_MAX_ATTEMPTS = 8
 ZCODE_CLI_CANDIDATES = ("/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",)
+ZCODE_PROVIDER_ID = "codex-helper-local"
+ZCODE_MODELS = ("GLM-5.3", "GLM-5.3-Flash")
 _snapshot_cache = {}
+
+
+# ZCode 无头 CLI 缺省没有可用 provider（模型选择由桌面 App 把守）。做法：解密本机
+# coding-plan API key（App 的 enc:v1 AES-256-GCM 信封，密钥为本机确定性 fallback），
+# 生成一份 personal provider 配置（含 defaultModelSelection），用环境变量喂给 CLI，
+# 不改动 ZCode 自身的任何文件。
+ZCODE_DECRYPT_NODE = r'''
+const crypto=require("crypto"),fs=require("fs"),os=require("os");
+const cred=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+const secret=process.env.ZCODE_CREDENTIAL_SECRET||
+  `zcode-credential-fallback:${process.platform}:${os.homedir()}:${os.userInfo().username}`;
+const key=crypto.createHash("sha256").update(secret).digest();
+for(const[k,v]of Object.entries(cred)){
+  if(!k.includes("coding-plan")||!k.endsWith(":api-key"))continue;
+  if(!v.startsWith("enc:v1:")){process.stdout.write(v);process.exit(0)}
+  try{
+    const[n,t,c]=v.slice(7).split(".");
+    const d=crypto.createDecipheriv("aes-256-gcm",key,Buffer.from(n,"base64url"));
+    d.setAuthTag(Buffer.from(t,"base64url"));
+    process.stdout.write(Buffer.concat([d.update(Buffer.from(c,"base64url")),d.final()]).toString("utf8"));
+    process.exit(0);
+  }catch(e){}
+}
+process.exit(1);
+'''
 
 
 def _state_db(codex_home):
@@ -64,6 +92,75 @@ def zcode_cmd():
     if not path:
         return None
     return ["node", path] if path.endswith(".cjs") else [path]
+
+
+def helper_data_dir():
+    return os.path.join(os.path.expanduser("~"), ".codex-model-watch")
+
+
+def zcode_api_key(credentials_path=None):
+    """Decrypt the local coding-plan API key from ZCode's credential store."""
+    path = credentials_path or os.path.join(os.path.expanduser("~"), ".zcode", "v2", "credentials.json")
+    if not os.path.isfile(path):
+        raise RuntimeError("未找到 ZCode 凭证文件: " + path)
+    proc = subprocess.run(["node", "-e", ZCODE_DECRYPT_NODE, path],
+                          capture_output=True, text=True, timeout=15)
+    key = (proc.stdout or "").strip()
+    if proc.returncode != 0 or not key:
+        raise RuntimeError("无法从 ZCode 凭证解密 coding-plan API key（登录态或格式变化）")
+    if key.count(".") != 1:
+        raise RuntimeError("解密出的 API key 不是 id.secret 形式，无法用于请求签名")
+    return key
+
+
+def ensure_zcode_provider_config(credentials_path=None, force=False):
+    """Write the personal provider config that unlocks headless model turns. Returns its path."""
+    out_path = os.path.join(helper_data_dir(), "zcode-provider-config.json")
+    if not force and os.path.isfile(out_path):
+        return out_path
+    key = zcode_api_key(credentials_path)
+    config = {
+        "schemaVersion": 1,
+        "config": {
+            "providerConfigRules": {
+                "providerRules": [{
+                    "providerId": ZCODE_PROVIDER_ID,
+                    "providerName": "Codex Helper Local",
+                    "enabled": True,
+                    "config": {
+                        "group": "standard-personal",
+                        "access": {"type": "zhipu-coding-plan-api-key", "apiKey": key},
+                        "api": {"type": "anthropic-messages",
+                                "baseUrl": "https://open.bigmodel.cn/api/anthropic"},
+                        "personalModelIds": list(ZCODE_MODELS),
+                    },
+                }]
+            },
+            "modelConfigRules": {"providerModelRules": [], "manualProviderModelRules": []},
+            "providerOrder": [ZCODE_PROVIDER_ID],
+            "defaultModelSelection": {"providerId": ZCODE_PROVIDER_ID, "modelId": ZCODE_MODELS[0]},
+        },
+    }
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as fh:
+        json.dump(config, fh, ensure_ascii=False, indent=1)
+    os.chmod(out_path, 0o600)
+    return out_path
+
+
+def zcode_env(credentials_path=None):
+    """Environment overlay that makes headless zcode.cjs runnable; (None, error) when unavailable."""
+    try:
+        config = ensure_zcode_provider_config(credentials_path)
+    except Exception as exc:
+        return None, str(exc)
+    env = {"ZCODE_PERSONAL_PROVIDER_CONFIG_FILE": config}
+    cli = zcode_bin()
+    builtin = os.path.normpath(os.path.join(os.path.dirname(cli), "..", "config", "provider",
+                                            "zcode-builtin.json")) if cli else ""
+    if builtin and os.path.isfile(builtin):
+        env["ZCODE_BUILTIN_PROVIDER_CONFIG_FILE"] = builtin
+    return env, ""
 
 
 def project_catalog(codex_home, include_mirrors=False):
@@ -396,8 +493,6 @@ def validate_rule(body, snapshots, codex_home=None, projects=None):
         agent = target.get("agent", "codex")
     if agent == "zcode" and kind == "new" and trigger == "quota":
         raise ValueError("ZCode 暂无实时额度接口，新任务请改用指定时间或关联任务完成触发")
-    if agent == "zcode" and kind == "new" and body.get("project_mode") == "create":
-        raise ValueError("ZCode 新任务请选择已存在的目录")
     project_mode = project_id = project_name = project_parent = None
     if kind == "new":
         project_mode = body.get("project_mode")
@@ -607,10 +702,15 @@ class Scheduler:
 
     def _run(self, rule):
         agent = rule.get("agent") or "codex"
+        env = None
         if agent == "zcode":
             base = zcode_cmd()
             if base is None:
                 self._finish(rule, "failed", "", "未找到 ZCode CLI（需要安装 ZCode.app 或设置 ZCODE_BIN 环境变量）")
+                return
+            env, env_error = zcode_env()
+            if env is None:
+                self._finish(rule, "failed", "", "ZCode 无头环境不可用：" + env_error)
                 return
             if rule["kind"] == "new":
                 cmd = [*base, "--prompt", rule["prompt"], "--cwd", rule["cwd"], "--json"]
@@ -627,8 +727,20 @@ class Scheduler:
                     self.conn.execute("INSERT OR IGNORE INTO helper_projects(id,name,path,created_at) VALUES(?,?,?,?)",
                                       ("helper-" + rule["id"], rule["project_name"], rule["cwd"], time.time()))
                     self.conn.commit()
+            if env is not None:
+                env = {**os.environ, **env}
             proc = subprocess.run(cmd, input=None if agent == "zcode" else rule["prompt"], text=True, cwd=rule["cwd"],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                  env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # ZCode 侧 API key 轮换会导致签名失效（401/过期）；强制刷新配置后重试一次
+            if (agent == "zcode" and proc.returncode != 0 and
+                    any(x in (proc.stderr or "") + (proc.stdout or "") for x in ("401", "过期", "invalid signature"))):
+                try:
+                    ensure_zcode_provider_config(force=True)
+                    env = {**os.environ, **zcode_env()[0]}
+                    proc = subprocess.run(cmd, input=None if agent == "zcode" else rule["prompt"], text=True,
+                                          cwd=rule["cwd"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                except Exception:
+                    pass
             task_id = rule["thread_id"]
             if rule["kind"] == "new" and agent == "codex":
                 for line in (proc.stdout or "").splitlines():

@@ -3,6 +3,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from watch_scheduler import (Scheduler, all_task_snapshots, init_db, validate_rule,
@@ -11,6 +12,10 @@ from watch_scheduler import (Scheduler, all_task_snapshots, init_db, validate_ru
 SESSION_ID = "sess_11111111-2222-3333-4444-555555555555"
 CWD = "/tmp/demo-zcode-project"
 TURN_MS = 1790067109494
+
+
+def datetime_now_iso():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def make_zcode_db(zcode_home, status="error", error_type="rate_limited"):
@@ -93,16 +98,36 @@ class ZcodeScheduleTest(unittest.TestCase):
         self.assertEqual("zcode", rule["agent"])
         self.assertIn("限流", rule["prompt"])
 
-    def test_validate_rule_rejects_zcode_quota_new_and_create(self):
+    def test_validate_rule_rejects_zcode_quota_new_only(self):
         projects = [{"id": "zcode-dir:" + CWD, "name": "demo-zcode-project", "path": CWD}]
         with self.assertRaises(ValueError):
             validate_rule({"kind": "new", "trigger": "quota", "agent": "zcode",
                            "project_mode": "existing", "project_id": "zcode-dir:" + CWD,
                            "prompt": "hi"}, [], projects=projects)
-        with self.assertRaises(ValueError):
-            validate_rule({"kind": "new", "trigger": "at", "agent": "zcode",
-                           "project_mode": "create", "project_name": "x",
-                           "project_parent": self.tmp.name, "prompt": "hi"}, [])
+        # create 模式对 zcode 同样可用（规则触发时创建目录）
+        rule = validate_rule({"kind": "new", "trigger": "at", "agent": "zcode",
+                              "project_mode": "create", "project_name": "x-" + self.id()[-6:],
+                              "project_parent": self.tmp.name, "prompt": "hi",
+                              "run_at": datetime_now_iso()}, [])
+        self.assertEqual("zcode", rule["agent"])
+
+    def test_zcode_env_wiring(self):
+        from watch_scheduler import zcode_env
+        with patch("watch_scheduler.ensure_zcode_provider_config",
+                   return_value=os.path.join(self.tmp.name, "prov.json")), \
+             patch("watch_scheduler.zcode_bin", return_value="/fake/Resources/glm/zcode.cjs"), \
+             patch("os.path.isfile", side_effect=lambda p: p in ("/fake/Resources/config/provider/zcode-builtin.json",)):
+            env, err = zcode_env()
+        self.assertEqual("", err)
+        self.assertEqual(os.path.join(self.tmp.name, "prov.json"),
+                         env["ZCODE_PERSONAL_PROVIDER_CONFIG_FILE"])
+        self.assertEqual("/fake/Resources/config/provider/zcode-builtin.json",
+                         env["ZCODE_BUILTIN_PROVIDER_CONFIG_FILE"])
+        with patch("watch_scheduler.ensure_zcode_provider_config",
+                   side_effect=RuntimeError("boom")):
+            env, err = zcode_env()
+        self.assertIsNone(env)
+        self.assertIn("boom", err)
 
     def test_zcode_quota_resume_due_without_quota_data(self):
         # 无 Codex 额度数据也能触发：ZCode 采用重试语义

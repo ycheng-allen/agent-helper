@@ -104,9 +104,9 @@ Codex Helper 的总览、模型用量、额度窗口、容量错误和主动探�
 
 ### ZCode 任务排程（实验性）
 
-排程 UI 已支持 ZCode 任务：任务选择器会列出 ZCode 最近会话，可以为它们创建"发送下一步"和"续跑"规则；续跑不依赖实时额度，任务因限流中断后每 5 分钟自动重试（最多 8 次）。
+排程已支持 ZCode：任务选择器会列出 ZCode 最近会话，可以创建"启动新任务"（指定时间 / 关联任务完成后）、"发送下一步"和"续跑"规则；续跑不依赖实时额度，任务因限流中断后每 5 分钟自动重试（最多 8 次）。
 
-⚠️ 当前 ZCode 0.16.x 的无头 CLI（`zcode.cjs --prompt` / app-server 协议）独立运行时无法创建模型会话（报 "Select a model before continuing"，模型访问由桌面 App 网关把守，无 `--model` 参数、无 API key 环境变量）。因此 ZCode 规则现在可以创建和排队，但实际执行要等 ZCode 提供受支持的无头模式后才会成功——届时排程器的重试机制会自动接住，代码无需改动。可用 `ZCODE_BIN` 环境变量指向自定义 CLI 路径。
+ZCode 无头 CLI 缺省没有可用模型（模型选择由桌面 App 把守）。Helper 会从本机 ZCode 凭证（`~/.zcode/v2/credentials.json`）解密 coding-plan API key，生成独立的 personal provider 配置写入 `~/.codex-model-watch/zcode-provider-config.json`（0600 权限），通过 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 环境变量注入 CLI——不改动 ZCode 自身的任何文件；API key 轮换时会在执行失败后自动刷新重试。可用 `ZCODE_BIN` 环境变量指向自定义 CLI 路径。
 
 主动探针会消耗一条很小的 Codex 请求额度，只有你主动点击时才会发出请求。历史日志无法可靠还原过去发生的模型切换，因此探针结果只代表发起探测时的状态。
 
@@ -117,7 +117,7 @@ Codex Helper 的总览、模型用量、额度窗口、容量错误和主动探�
 - 这是本机助手，不是云端任务队列；电脑关机、睡眠或应用退出时无法触发规则；
 - Codex rollout 和状态数据库属于本地内部格式，未来 Codex 版本变化可能需要适配；
 - 额度水位来自 Codex 上报数据，界面展示会有刷新间隔；
-- ZCode 支持覆盖使用统计与排程（实验性）：探针与额度面板仅支持 Codex；ZCode 规则的实际执行依赖 ZCode 未来提供受支持的无头 CLI 模式（见上文）；
+- ZCode 支持覆盖使用统计与排程（实验性）：探针与额度面板仅支持 Codex；ZCode 无实时额度接口，"下一次额度刷新"触发不可用（见上文）；
 - ZCode 导入只读访问 `~/.zcode/cli/db/db.sqlite`，不会写入 ZCode 的任何数据；
 - 任务选择器排除已归档任务和子代理任务；
 - 新项目会在规则真正触发时创建，避免排程还没执行目录就先占坑。

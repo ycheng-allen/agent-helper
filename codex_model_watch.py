@@ -13,9 +13,12 @@ Codex Helper —— 本地监控 Codex / ZCode 的模型使用、额度水位、
      因此「被偷换成了什么」无法从日志还原 —— 这正是探针存在的意义。
   2. 数据库侧（ZCode）：ZCode 自身把每轮用量写进 ~/.zcode/cli/db/db.sqlite（turn_usage /
      model_usage / session 表）。本工具以只读方式增量导入，得到模型、token、时长、TTFT、
-     错误类型与项目分布。任务排程通过 ZCode.app 内置的 zcode.cjs 无头 CLI 执行
-     （新任务 / 指定时间 / 关联完成 / 续跑；ZCode 没有实时额度接口，中断续跑采用
-     定时重试直到恢复）。探针与实时额度面板仅支持 Codex。
+     错误类型与项目分布。任务排程通过 ZCode.app 内置的 zcode.cjs 无头 CLI 执行：
+     本工具会从 ZCode 本机凭证解密 coding-plan API key，生成一份独立的 personal
+     provider 配置（~/.codex-model-watch/zcode-provider-config.json，0600）并经
+     ZCODE_PERSONAL_PROVIDER_CONFIG_FILE 环境变量注入，使无头 CLI 具备默认模型。
+     ZCode 没有实时额度接口，中断续跑采用定时重试直到恢复；探针与实时额度面板仅支持
+     Codex。
   3. 探针侧（仅 Codex）：用你本地的 Codex 登录态（~/.codex/auth.json）向
      chatgpt.com/backend-api/codex/responses 发一条最小请求，读取 SSE
      response.created 事件里服务端实际派出的模型，即可即时验证「请求 X 会被派什么」。
@@ -32,7 +35,9 @@ import sys
 import threading
 import time
 import webbrowser
-from watch_scheduler import Scheduler, all_task_snapshots, available_projects, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows, task_snapshots, validate_rule
+from watch_scheduler import (Scheduler, all_task_snapshots, available_projects, ensure_zcode_provider_config,
+                             init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows,
+                             task_snapshots, validate_rule)
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -790,6 +795,10 @@ def main():
                 print("[codex-helper] zcode 已导入 %d 个会话、%d 轮" % (zstats["files"], zstats["turns"]))
                 if zstats.get("note"):
                     notes.append(zstats["note"])
+                try:
+                    ensure_zcode_provider_config()
+                except Exception as exc:
+                    notes.append("ZCode 无头执行环境初始化失败（排程将无法执行 ZCode 任务）: " + str(exc))
         else:
             stats = {"files": 0}
         g_last_scan = time.time()
