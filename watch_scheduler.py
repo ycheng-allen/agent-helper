@@ -309,7 +309,18 @@ def thread_titles(codex_home):
 
 
 def codex_bin():
-    return shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
+    env = os.environ.get("CODEX_BIN")
+    if env and os.path.isfile(env):
+        return env
+    found = shutil.which("codex")
+    if found:
+        return found
+    for path in ("/opt/homebrew/bin/codex", "/usr/local/bin/codex", "/usr/bin/codex",
+                 os.path.expanduser("~/.local/bin/codex"),
+                 os.path.expanduser("~/.codex/bin/codex")):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return os.path.expanduser("~/.local/bin/codex")
 
 
 def read_quota(timeout=12):

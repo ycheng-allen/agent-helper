@@ -490,7 +490,7 @@ const I18N={
   newRule:{ch:'创建一次性规则',en:'New one-shot rule'},
   startNew:{ch:'启动新任务',en:'New task'}, sendNext:{ch:'发送下一步',en:'Follow-up'}, resumeTask:{ch:'续跑任务',en:'Resume'},
   taskCmd:{ch:'任务指令',en:'Prompt'},
-  saveRule:{ch:'保存规则',en:'Save rule'}, queue:{ch:'Schedule 队列',en:'Schedule queue'},
+  saveRule:{ch:'提交',en:'Submit'}, queue:{ch:'Schedule 队列',en:'Schedule queue'},
   // sprint
   sprintHead:{ch:'免费玩命蹬',en:'Free Sprint'},
   sprintQueue:{ch:'任务队列',en:'Task queue'},
@@ -581,7 +581,7 @@ const I18N={
   newProjName:{ch:'新项目名称',en:'New folder name'}, saveTo:{ch:'保存到哪个文件夹',en:'Parent folder'},
   mkdirNote:{ch:'规则触发时创建新目录，并在其中启动任务。',en:'The directory is created when the rule runs.'},
   onceNote:{ch:'保存后只执行一次；应用需保持运行。',en:'Runs once; keep the app open.'},
-  localNote:{ch:'本地保存 · 可在执行前取消',en:'Stored locally · cancel before it runs'},
+  localNote:{ch:'提交后进入队列 · 可在执行前取消',en:'Queued after submit · cancel before it runs'},
   queueSub:{ch:'等待中的规则按计划时间展示；触发条件满足后开始执行。',en:'Waiting rules show by schedule; they run when their trigger fires.'},
   cancel:{ch:'取消',en:'Cancel'}, autoMon:{ch:'自动监控',en:'auto'}, taskId:{ch:'任务 ID',en:'Task ID'},
   qNoHistory:{ch:'还没有执行记录',en:'No history yet'}, qEmpty:{ch:'队列为空。创建规则后会在这里显示。',en:'Queue is empty.'},
@@ -643,7 +643,7 @@ const I18N={
   msgPickExistProj:{ch:'请选择现有项目',en:'Pick an existing project'},
   msgFillNewProj:{ch:'请填写新项目名称和保存位置',en:'Enter the new project name and parent folder'},
   msgFutureTime:{ch:'请选择将来的执行时间',en:'Pick a future time'},
-  saving:{ch:'保存中…',en:'Saving…'}, savingRule:{ch:'正在保存规则',en:'Saving rule'},
+  saving:{ch:'提交中…',en:'Submitting…'}, savingRule:{ch:'正在提交规则',en:'Submitting rule'},
   saveFailed:{ch:'保存失败',en:'Save failed'},
   startedNow:{ch:'已开始执行',en:'Started'}, queued:{ch:'已加入排程队列',en:'Queued'},
   cancelNo:{ch:'规则已开始执行，无法取消',en:'Already running, cannot cancel'},
@@ -690,11 +690,19 @@ const fmtMoney=(n,currency='cny')=>{
   const v=n>=100?String(Math.round(n)):n.toFixed(2);
   return (currency==='usd'?'$':'¥')+v;
 };
+let usdCnyRate=7.1;  // updated from backend on load
+function fmtDisp(nativeUsd,nativeCny){
+  // unified display currency per language
+  if(LANG==='en'){
+    const v=nativeUsd!=null?nativeUsd:(nativeCny!=null?nativeCny/usdCnyRate:undefined);
+    return v!=null?fmtMoney(v,'usd'):'—';
+  }
+  const v=nativeCny!=null?nativeCny:(nativeUsd!=null?nativeUsd*usdCnyRate:undefined);
+  return v!=null?fmtMoney(v,'cny'):'—';
+}
 function fmtNative(modelRow){
   if(!modelRow)return '—';
-  if(modelRow.native_usd!=null)return fmtMoney(modelRow.native_usd,'usd');
-  if(modelRow.native_cny!=null)return fmtMoney(modelRow.native_cny,'cny');
-  return '—';
+  return fmtDisp(modelRow.native_usd,modelRow.native_cny);
 }
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
@@ -770,7 +778,7 @@ function render(d){
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
       <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td>
-      <td>${m.cost?fmtNative({native_usd:m.cost.usd,native_cny:m.cost.cny}):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
+      <td>${m.cost?fmtDisp(m.cost.usd,m.cost.cny):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
   const pr=d.projects||[];
   $('#tProj').innerHTML='<tr><th>'+t('thProj')+'</th><th>'+t('thTurns')+'</th><th>'+t('thTok')+'</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">'+t('noProj')+'</td></tr>');
@@ -815,6 +823,7 @@ async function load(){
   $('#sAuto').disabled=!!d.meta.demo;
   $('#sSave').disabled=!!d.meta.demo;
   if(d.meta.demo)scheduleMessage(t('demoSched'));
+  if(d.cost&&d.cost.usd_cny)usdCnyRate=d.cost.usd_cny;
   const counts={};(d.agents||[]).forEach(a=>counts[a.agent]=a.turns);
   [['codexCount','codex'],['zcodeCount','zcode']].forEach(([id,k])=>{
     const el=$('#'+id);
@@ -1150,6 +1159,7 @@ let statRange=30;
 const STAT_RANGES=[['r30',30],['rMonth',0]];
 async function loadStats(){
   try{statsData=await(await fetch('/api/overview')).json();}catch(e){return;}
+  if(statsData.usd_cny)usdCnyRate=statsData.usd_cny;
   renderStats();
 }
 function setStatRange(days){
@@ -1174,8 +1184,8 @@ function renderStats(){
   const curDisp=LANG==='en'?'usd':'cny';
   $('#statCards').innerHTML=
     `<div class="card"><div class="k">${t('statTotal')}</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(monthTotal,curDisp)}</div><div class="s">${prevTotal?`${LANG==='en'?'Last month':'上月'} ${fmtMoney(prevTotal,curDisp)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
-    `<div class="card"><div class="k">${t('statCodex')}</div><div class="v">${fmtMoney((s.per_agent.codex||{}).usd||0,'usd')}</div><div class="s">≈ ¥${((s.per_agent.codex||{}).cny_total||0).toFixed(2)} · ${t('rate')} ${s.usd_cny}</div></div>`+
-    `<div class="card"><div class="k">${t('statZcode')}</div><div class="v">${fmtMoney((s.per_agent.zcode||{}).cny||0)}</div><div class="s">${LANG==='en'?'≈ $'+((s.per_agent.zcode||{}).usd_total||0).toFixed(2):'GLM 国内牌价折算'}</div></div>`+
+    `<div class="card"><div class="k">${t('statCodex')}</div><div class="v">${fmtDisp((s.per_agent.codex||{}).usd,(s.per_agent.codex||{}).cny_total)}</div><div class="s">${t('rate')} ${s.usd_cny}</div></div>`+
+    `<div class="card"><div class="k">${t('statZcode')}</div><div class="v">${fmtDisp((s.per_agent.zcode||{}).native_usd!=null?(s.per_agent.zcode||{}).native_usd:(s.per_agent.zcode||{}).usd_total,(s.per_agent.zcode||{}).cny)}</div><div class="s">${LANG==='en'?'Z.ai intl rates':'GLM 国内牌价'}</div></div>`+
     `<div class="card"><div class="k">${t('statTokens')}</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">${t('tokenIn')} ${fmtTok(s.totals.tokens_in)} · ${t('tokenOut')} ${fmtTok(s.totals.tokens_out)}</div></div>`+
     `<div class="card"><div class="k">${t('statTurns')}</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">${t('thErr')} ${fmt(s.totals.errors)}</div></div>`;
   // 每日费用堆叠柱
@@ -1206,8 +1216,8 @@ function renderStats(){
     options:{plugins:{legend:{labels:{boxWidth:12}}}}});
   // 本月概览表
   $('#tMonth').innerHTML='<tr><th>'+t('thItem')+'</th><th>'+t('thMonth')+'</th></tr>'+
-    `<tr><td>${t('monthTableRowCodex')}</td><td>${fmtMoney((agents.codex||{}).usd||0,'usd')}</td></tr>`+
-    `<tr><td>${t('monthTableRowZcode')}</td><td>${fmtMoney((agents.zcode||{}).cny||0,'cny')}</td></tr>`+
+    `<tr><td>${t('monthTableRowCodex')}</td><td>${fmtDisp((agents.codex||{}).usd,(agents.codex||{}).cny_total)}</td></tr>`+
+    `<tr><td>${t('monthTableRowZcode')}</td><td>${fmtDisp((agents.zcode||{}).usd_total,(agents.zcode||{}).cny)}</td></tr>`+
     `<tr><td>${t('monthTableRowTotal')}</td><td><b>${fmtMoney(LANG==='en'?(month.usd_total||0):(month.cny_total||0),curDisp)}</b></td></tr>`+
     `<tr><td>${t('monthTableRowTurns')}</td><td>${fmt(s.totals.turns)} / ${fmt(s.totals.errors)}</td></tr>`+
     `<tr><td>${t('monthTableRowSampled')}</td><td>${String(s.generated_at||'').slice(5,16).replace('T',' ')}</td></tr>`;
