@@ -777,7 +777,7 @@ function render(d){
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
       <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td>
-      <td>${m.cost?fmtDisp(m.cost.usd,m.cost.cny):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
+      <td>${(m.cost_usd!=null||m.cost_cny!=null)?fmtDisp(m.cost_usd,m.cost_cny):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
   const pr=d.projects||[];
   $('#tProj').innerHTML='<tr><th>'+t('thProj')+'</th><th>'+t('thTurns')+'</th><th>'+t('thTok')+'</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">'+t('noProj')+'</td></tr>');
