@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Codex Helper</title>
+<title>Agent Helper</title>
 <style>
   :root{
     --bg:#131210; --card:#1a1917; --card2:#1f1d1a; --border:#2b2924; --border2:#38352e;
@@ -184,7 +184,7 @@
 <body>
 <div class="wrap">
   <div class="topbar">
-    <div class="logo"><b>CODEX HELPER</b><span>额度监控与任务排程</span></div>
+    <div class="logo"><b>AGENT HELPER</b><span>额度监控与任务排程</span></div>
     <div class="switcher" role="tablist" aria-label="选择助手">
       <button class="switch-btn c-codex" id="agentCodex" role="tab" aria-selected="true" onclick="switchAgent('codex')">Codex<span class="switch-count" id="codexCount" hidden></span></button>
       <button class="switch-btn c-zcode" id="agentZcode" role="tab" aria-selected="false" onclick="switchAgent('zcode')">ZCode<span class="switch-count" id="zcodeCount" hidden></span></button>
@@ -239,7 +239,7 @@
   </div>
 
   <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
-    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证；ZCode 无实时额度接口，额度面板与探针仅支持 Codex</div>
+    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.codex-model-watch/pricing.json 覆盖），非实际账单</div>
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
@@ -409,6 +409,10 @@ function modelBadge(m){
   return `<span class="mbadge" style="background:${color}">${m}</span>`;
 }
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
+const fmtMoney=(n,currency='cny')=>{
+  const v=n>=100?String(Math.round(n)):n.toFixed(2);
+  return (currency==='usd'?'$':'¥')+v;
+};
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
 function renderQuota(quota,agent='codex'){
@@ -450,6 +454,11 @@ function render(d){
   const cov=d.coverage||{};
   $('#cards').innerHTML=
     `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮</div></div>`+
+    (()=>{const c=d.cost||{};const m=c.month||{};const both=c.month_total!=null;
+      const sub=both?`Codex ${fmtMoney(c.month_usd||0,'usd')} · ZCode ¥${(c.month_cny||0).toFixed(2)} · 汇率 ${c.usd_cny}`
+                    :(m.unpriced_tokens?`含未计价 ${fmtTok(m.unpriced_tokens)} tok`:'');
+      return `<div class="card"><div class="k">本月等价费用</div><div class="v">${both?fmtMoney(c.month_total,'cny'):fmtMoney(m.total_cny||0,'cny')}</div>
+        <div class="s">${sub}</div></div>`;})()+
     `<div class="card"><div class="k">Token 输入</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">输出 ${fmtTok(s.tokens_out)} · 缓存命中 ${fmtTok(s.tokens_cached)}</div></div>`+
     `<div class="card"><div class="k">容量拒单</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">上游容量不足直接拒绝</div></div>`+
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
@@ -470,11 +479,12 @@ function render(d){
   charts.t?.destroy();charts.t=new Chart($('#cTrend'),tCfg);
   const models=d.models||[];
   const tot=models.reduce((a,m)=>a+m.turns,0)||1;
-  $('#tModel').innerHTML='<tr><th>模型</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th></tr>'+
+  $('#tModel').innerHTML='<tr><th>模型</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th><th>费用</th></tr>'+
     models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${fmt(m.turns)}</td>
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
-      <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td></tr>`).join('');
+      <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td>
+      <td>${m.cost?fmtMoney(m.cost.amount,m.cost.currency):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
   const pr=d.projects||[];
   $('#tProj').innerHTML='<tr><th>项目</th><th>轮次</th><th>tokens</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">暂无</td></tr>');
@@ -536,7 +546,7 @@ function applyAgentFrame(){
   $('#zSchedNote').hidden=!z;
   $('#optQuota').hidden=z;
   if(z&&$('#sTrigger').value==='quota'){$('#sTrigger').value='at';scheduleFields();}
-  try{document.title=z?'ZCode · Codex Helper':'Codex Helper';}catch(e){}
+  try{document.title=z?'ZCode · Agent Helper':'Codex · Agent Helper';}catch(e){}
 }
 function switchAgent(a){
   if(a===curAgent){setTab(curTab);return;}

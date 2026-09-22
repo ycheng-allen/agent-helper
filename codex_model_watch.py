@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Codex Helper —— 本地监控 Codex / ZCode 的模型使用、额度水位、容量拒单，并主动探测模型偷换。
+Agent Helper —— 本地监控 Codex / ZCode 的模型使用、额度水位、容量拒单，并主动探测模型偷换。
 
 原理（详见 README）：
   1. 日志侧（Codex）：Codex 会把每一轮会话写入 ~/.codex/sessions/**/*.jsonl（rollout 文件）。
@@ -413,6 +413,118 @@ def run_probe(codex_home, model):
             "latency_ms": latency, "safety_header": safety, "error": error}
 
 
+# ---------------------------------------------------------------- 费用估算
+
+# 公开 API 牌价（每 1M tokens）。来源：openai.com/api/pricing 与 bigmodel.cn 刊例，
+# 2026-09 采集；cached 缺省按输入价 10%。可被 ~/.codex-model-watch/pricing.json 覆盖：
+# {"usd_cny": 7.1, "rates": {"模型前缀": {"in":x,"cached":y,"out":z,"currency":"usd|cny"}}}
+PRICING_USD_CNY = 7.1
+PRICING_RATES = [
+    # (前缀, 输入, 缓存输入, 输出, 币种)  前缀最长者优先
+    ("gpt-5.6-sol", 4.0, 0.40, 20.0, "usd"),
+    ("gpt-5.6-terra", 2.0, 0.20, 12.0, "usd"),
+    ("gpt-5.6-luna", 0.20, 0.02, 1.20, "usd"),
+    ("gpt-5.6", 2.0, 0.20, 12.0, "usd"),
+    ("gpt-6-astra", 4.0, 0.40, 20.0, "usd"),      # 未见于牌价，按旗舰档估
+    ("gpt-6", 4.0, 0.40, 20.0, "usd"),
+    ("gpt-5.5", 5.0, 0.50, 30.0, "usd"),
+    ("gpt-5.4", 2.5, 0.25, 15.0, "usd"),
+    ("gpt-5", 1.25, 0.125, 10.0, "usd"),
+    ("codex-auto-review", 0.0, 0.0, 0.0, "usd"),  # Codex 内部审查模型
+    ("glm-5.3-flash", 0.8, 0.16, 2.8, "cny"),
+    ("glm-5.3", 8.0, 1.6, 28.0, "cny"),
+    ("glm-5.2", 8.0, 1.6, 28.0, "cny"),
+    ("glm-5", 8.0, 1.6, 28.0, "cny"),
+    ("glm-4.7", 2.0, 0.4, 8.0, "cny"),
+    ("glm-4", 2.0, 0.4, 8.0, "cny"),
+]
+_pricing_cache = {}
+
+
+def load_pricing():
+    """Embedded rates merged with the user's optional pricing.json override."""
+    if _pricing_cache:
+        return _pricing_cache["data"]
+    rates = list(PRICING_RATES)
+    usd_cny = PRICING_USD_CNY
+    path = os.path.join(APP_DIR, "pricing.json")
+    if os.path.isfile(path):
+        try:
+            cfg = json.load(open(path, encoding="utf-8"))
+            usd_cny = float(cfg.get("usd_cny", usd_cny))
+            overrides = cfg.get("rates") or {}
+            merged = {p[0]: p for p in rates}
+            for prefix, r in overrides.items():
+                merged[prefix.lower()] = (prefix.lower(), float(r.get("in", 0)),
+                                          float(r.get("cached", r.get("in", 0) * 0.1)),
+                                          float(r.get("out", 0)), r.get("currency", "usd"))
+            rates = sorted(merged.values(), key=lambda p: -len(p[0]))
+        except Exception:
+            pass
+    rates.sort(key=lambda p: -len(p[0]))
+    _pricing_cache["data"] = (rates, usd_cny)
+    return _pricing_cache["data"]
+
+
+def model_price(model):
+    """Match a model id to a rate entry; None when unpriced."""
+    rates, _ = load_pricing()
+    low = (model or "").lower()
+    for prefix, pin, pcached, pout, currency in rates:
+        if low.startswith(prefix):
+            return {"in": pin, "cached": pcached, "out": pout, "currency": currency}
+    return None
+
+
+def price_tokens(model, tin, tcached, tout, usd_cny):
+    """Cost of one aggregate row; None when the model is unpriced.
+
+    in_tokens already includes cached tokens, so fresh input is billed at
+    the full rate and cached at the cached rate.
+    """
+    p = model_price(model)
+    if not p:
+        return None
+    fresh = max(0, (tin or 0) - (tcached or 0))
+    amount = ((fresh * p["in"]) + (tcached or 0) * p["cached"] + (tout or 0) * p["out"]) / 1e6
+    return {"amount": round(amount, 4), "currency": p["currency"],
+            "cny": round(amount * (usd_cny if p["currency"] == "usd" else 1.0), 4)}
+
+
+def month_cutoff():
+    """UTC timestamp string for the start of the current local month."""
+    now_local = datetime.now().astimezone()
+    start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def compute_cost(conn, agent, cutoff):
+    """Aggregate month-to-date token cost for one agent (or both when agent='')."""
+    _, usd_cny = load_pricing()
+    cond = {"c": cutoff, "a": agent}
+    rows = conn.execute("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent,
+                                  COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(cached_tokens),0) tcached,
+                                  COALESCE(SUM(out_tokens),0) tout, COUNT(*) turns
+                           FROM turns WHERE (:c='' OR ts>=:c) AND (:a='' OR agent=:a)
+                           GROUP BY model, agent ORDER BY tin DESC""", cond).fetchall()
+    result = {"usd": 0.0, "cny": 0.0, "unpriced_tokens": 0, "models": []}
+    for r in rows:
+        cost = price_tokens(r["model"], r["tin"], r["tcached"], r["tout"], usd_cny)
+        if cost is None:
+            result["unpriced_tokens"] += (r["tin"] or 0) + (r["tout"] or 0)
+            continue
+        result["usd"] += cost["amount"] if cost["currency"] == "usd" else 0.0
+        result["cny"] += cost["cny"]
+        result["models"].append({"model": r["model"], "agent": r["agent"], "turns": r["turns"],
+                                 "tin": r["tin"], "tout": r["tout"],
+                                 "cost": cost["amount"], "currency": cost["currency"]})
+    result["usd"] = round(result["usd"], 2)
+    result["cny"] = round(result["cny"], 2)
+    result["total_cny"] = round(result["usd"] * usd_cny + result["cny"], 2)
+    result["models"].sort(key=lambda m: -m["cost"])
+    return result
+
+
 # ---------------------------------------------------------------- 聚合输出
 
 def api_data(conn, days=0, agent=""):
@@ -444,6 +556,7 @@ def api_data(conn, days=0, agent=""):
                   FROM turns WHERE ts IS NOT NULL AND """ + flt + " GROUP BY bucket ORDER BY bucket", cond)
     models = q("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent, COUNT(*) turns,
                          COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(out_tokens),0) tout,
+                         COALESCE(SUM(cached_tokens),0) tcached,
                          AVG(duration_ms) avg_dur,
                          SUM(CASE WHEN error_kind IS NOT NULL THEN 1 ELSE 0 END) errors
                   FROM turns WHERE """ + ts_flt + " AND " + flt +
@@ -461,8 +574,12 @@ def api_data(conn, days=0, agent=""):
     probe_summary = conn.execute("""SELECT COUNT(*) n, COALESCE(SUM(swapped),0) swapped
                                     FROM probes""").fetchone()
     total_models = sum(m["turns"] for m in models) or 1
+    _, usd_cny = load_pricing()
     for m in models:
         m["share"] = round(m["turns"] * 100.0 / total_models, 1)
+        m["cost"] = price_tokens(m["model"], m["tin"], m["tcached"], m["tout"], usd_cny)
+    cost_month = compute_cost(conn, agent, month_cutoff())
+    cost_month_both = compute_cost(conn, "", month_cutoff())
     return {
         "meta": {"generated_at": iso_now(), "demo": g_state["demo"],
                  "agents_enabled": (g_args.agents if g_args else ["codex", "zcode"])},
@@ -472,6 +589,9 @@ def api_data(conn, days=0, agent=""):
                     "capacity": win["capacity"] or 0,
                     "avg_duration_ms": int(win["avg_dur"] or 0)},
         "agents": agents,
+        "cost": {"month": cost_month, "month_total": cost_month_both["total_cny"],
+                 "month_usd": cost_month_both["usd"], "month_cny": cost_month_both["cny"],
+                 "usd_cny": usd_cny},
         "hourly": hourly, "models": models, "projects": projects,
         "errors_recent": errors_recent,
         "quota": {"latest": quota_latest[0] if quota_latest else None,
@@ -830,7 +950,7 @@ def detect_agents(codex_home, zcode_home):
 
 def main():
     global g_args, g_last_scan, g_scheduler
-    ap = argparse.ArgumentParser(description="Codex Helper —— 本地监控 Codex / ZCode 使用情况并安排 Codex 任务")
+    ap = argparse.ArgumentParser(description="Agent Helper —— 本地监控 Codex / ZCode 使用情况并安排 Codex 任务")
     ap.add_argument("--port", type=int, default=8787, help="本地网页端口（默认 8787）")
     ap.add_argument("--codex-home", default=os.path.join(HOME, ".codex"), help="Codex 主目录（默认 ~/.codex）")
     ap.add_argument("--zcode-home", default=os.path.join(HOME, ".zcode"), help="ZCode 主目录（默认 ~/.zcode）")
@@ -860,7 +980,7 @@ def main():
                     notes.append(stats["note"])
             if "zcode" in g_args.agents:
                 zstats = import_zcode(conn_, g_args.zcode_home, g_args.max_age_days)
-                print("[codex-helper] zcode 已导入 %d 个会话、%d 轮" % (zstats["files"], zstats["turns"]))
+                print("[agent-helper] zcode 已导入 %d 个会话、%d 轮" % (zstats["files"], zstats["turns"]))
                 if zstats.get("note"):
                     notes.append(zstats["note"])
                 try:
@@ -872,10 +992,10 @@ def main():
         g_last_scan = time.time()
     n_turn = conn_.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
     n_probe = conn_.execute("SELECT COUNT(*) FROM probes").fetchone()[0]
-    print("[codex-helper] 已解析 %d 个文件，累计 %d 轮会话、%d 次探针" %
+    print("[agent-helper] 已解析 %d 个文件，累计 %d 轮会话、%d 次探针" %
           (stats.get("files", 0), n_turn, n_probe))
     for note in notes:
-        print("[codex-helper] " + note)
+        print("[agent-helper] " + note)
     if g_args.scan_only:
         for agent in g_args.agents:
             top = conn_.execute("""SELECT served, COUNT(*) n FROM turns WHERE agent=?
@@ -894,7 +1014,7 @@ def main():
 
     server = ThreadingHTTPServer(("127.0.0.1", g_args.port), Handler)
     url = "http://127.0.0.1:%d" % g_args.port
-    print("[codex-helper] 面板地址: %s  （Ctrl+C 退出）" % url)
+    print("[agent-helper] 面板地址: %s  （Ctrl+C 退出）" % url)
     if not g_args.no_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

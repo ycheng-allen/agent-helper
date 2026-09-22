@@ -1,10 +1,10 @@
-# Codex Helper
+# Agent Helper
 
 **中文** | [English](README.en.md)
 
-> 你舍不得骑的自行车，别人站起来蹬，codex helper，帮你站起来蹬！
+> 你舍不得骑的自行车，别人站起来蹬，agent helper，帮你站起来蹬！
 
-Codex Helper 是一个跑在本机的 Codex / ZCode 任务监控与排程助手。它盯着正在工作的任务，记住你想做的下一步，在额度恢复、前一项任务结束或指定时间到达时，替你把下一句 Prompt 送回正确的 Codex 对话。总览页同时统计 Codex 与 ZCode（只读导入 `~/.zcode/cli/db/` 的用量数据库）的模型使用、token 与错误。
+Agent Helper（原名 Codex Helper）是一个跑在本机的 Codex / ZCode 任务监控与排程助手。它盯着正在工作的任务，记住你想做的下一步，在额度恢复、前一项任务结束或指定时间到达时，替你把下一句 Prompt 送回正确的 Codex 对话。总览页同时统计 Codex 与 ZCode（只读导入 `~/.zcode/cli/db/` 的用量数据库）的模型使用、token 与错误。
 
 简单说：你负责提出宏伟目标，Codex 负责写代码，Codex Helper 负责在大家都快忘了这件事的时候把工作接起来。
 
@@ -47,7 +47,7 @@ Codex Helper 是一个跑在本机的 Codex / ZCode 任务监控与排程助手�
 
 ### macOS Apple Silicon
 
-下载 [Codex Helper ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest)，拖入“应用程序”后启动。当前构建未经过 Apple Developer ID 签名，首次打开时可在 Finder 中右键选择“打开”。
+下载 [Agent Helper ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest)，拖入“应用程序”后启动。当前构建未经过 Apple Developer ID 签名，首次打开时可在 Finder 中右键选择“打开”。
 
 也可以从源码构建：
 
@@ -56,7 +56,7 @@ npm install
 npm run dist
 ```
 
-生成的安装包位于 `dist/Codex Helper-*.dmg`。
+生成的安装包位于 `dist/Agent Helper-*.dmg`。
 
 ### 从源码运行
 
@@ -89,7 +89,7 @@ python3 codex_model_watch.py --no-open
 
 ## 监测功能从哪里来
 
-Codex Helper 的总览、模型用量、额度窗口、容量错误和主动探针能力，继承并扩展自 [ysh1112/codex-model-watch](https://github.com/ysh1112/codex-model-watch)。感谢原作者 ysh1112 提供本地 Codex 会话日志解析、用量统计和模型探针的基础实现。
+Agent Helper 的总览、模型用量、额度窗口、容量错误和主动探针能力，继承并扩展自 [ysh1112/codex-model-watch](https://github.com/ysh1112/codex-model-watch)。感谢原作者 ysh1112 提供本地 Codex 会话日志解析、用量统计和模型探针的基础实现。
 
 本项目在此基础上加入了 Electron 菜单栏应用、任务状态监控、项目 → 任务选择、额度恢复续跑、下一步 Prompt、一次性排程和可视化队列。原项目的监测能力仍然保留，只是现在终于有人负责在额度见底时提醒大家别继续硬蹭了。
 

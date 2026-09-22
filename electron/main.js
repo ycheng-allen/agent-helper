@@ -77,7 +77,7 @@ function showMainWindow() {
   if (!mainWindow) {
     mainWindow = new BrowserWindow({
       width: 1080, height: 760, minWidth: 760, minHeight: 560,
-      title: 'Codex Helper', show: false,
+      title: 'Agent Helper', show: false,
       webPreferences: { contextIsolation: true, sandbox: true }
     });
     mainWindow.loadURL(`http://127.0.0.1:${port}`);
@@ -101,7 +101,7 @@ function createTray() {
   if (icon.isEmpty()) throw new Error(`状态栏图标加载失败: ${iconPath}`);
   icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip('Codex Helper · 点击查看面板');
+  tray.setToolTip('Agent Helper · 点击查看面板');
   tray.on('click', () => panel?.isVisible() ? panel.hide() : showPanel());
   tray.on('right-click', () => tray.popUpContextMenu(Menu.buildFromTemplate([
     { label: '打开监控面板', click: showPanel },
@@ -122,7 +122,7 @@ app.whenReady().then(async () => {
     await waitForBackend();
     createTray();
   } catch (err) {
-    dialog.showErrorBox('Codex Helper 启动失败', String(err.message || err));
+    dialog.showErrorBox('Agent Helper 启动失败', String(err.message || err));
     app.quit();
   }
 });

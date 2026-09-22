@@ -1,8 +1,8 @@
-# Codex Helper
+# Agent Helper
 
 [中文](README.md) | **English**
 
-Codex Helper is a local task monitor and scheduler for Codex and ZCode. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back. The Overview also tracks ZCode usage (read-only import from `~/.zcode/cli/db/`) alongside Codex: models, tokens and errors per agent.
+Agent Helper (formerly Codex Helper) is a local task monitor and scheduler for Codex and ZCode. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back. The Overview also tracks ZCode usage (read-only import from `~/.zcode/cli/db/`) alongside Codex: models, tokens and errors per agent.
 
 The Chinese tagline says it best: *the bicycle you are too precious to ride gets stood-on and pedaled by Codex Helper.*
 
@@ -36,7 +36,7 @@ Task state is scanned every five seconds. The Overview reads live quota from the
 
 ## Install on macOS Apple Silicon
 
-Download the [latest ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest), move Codex Helper to Applications, and open it. The current build is not signed with an Apple Developer ID; use Finder's Open action the first time.
+Download the [latest ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest), move Agent Helper to Applications, and open it. The current build is not signed with an Apple Developer ID; use Finder's Open action the first time.
 
 Build locally with:
 
@@ -45,17 +45,17 @@ npm install
 npm run dist
 ```
 
-The DMG is written to `dist/Codex Helper-*.dmg`.
+The DMG is written to `dist/Agent Helper-*.dmg`.
 
 ## Where monitoring came from
 
 The Overview tab, local session parsing, model usage, quota windows, capacity errors and active probe are based on [ysh1112/codex-model-watch](https://github.com/ysh1112/codex-model-watch). Thanks to ysh1112 for the original local Codex log parser, usage dashboard and model probe.
 
-Codex Helper extends that foundation with an Electron menu-bar app, task monitoring, Project → Task selection, quota resume, follow-up prompts, one-time scheduling and a visible queue. The original monitoring features remain available; they now have a scheduler to keep the work moving.
+Agent Helper extends that foundation with an Electron menu-bar app, task monitoring, Project → Task selection, quota resume, follow-up prompts, one-time scheduling and a visible queue. The original monitoring features remain available; they now have a scheduler to keep the work moving.
 
 ## Privacy and boundaries
 
-Codex Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.codex-model-watch/state.db`. The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
+Agent Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.codex-model-watch/state.db`. The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
 
 This is a local helper, not a cloud queue. It cannot trigger work while the app or computer is asleep. Codex's internal rollout formats may change. The active probe uses a small request and only runs when you explicitly trigger it.
 
