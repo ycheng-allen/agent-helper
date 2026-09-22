@@ -21,6 +21,18 @@
   .logo span{font-size:10.5px;color:var(--dim);letter-spacing:.5px}
   .topbar .title{font-size:13px;color:var(--dim)}
   .topbar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .switcher{margin-left:16px;display:flex;gap:4px;padding:4px;background:var(--card);
+    border:1px solid var(--border);border-radius:10px}
+  .switch-btn{border:1px solid transparent;border-radius:7px;background:transparent;color:var(--dim);
+    font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:7px 20px;
+    display:inline-flex;align-items:center;gap:7px}
+  .switch-btn:hover{color:var(--txt)}
+  .switch-btn.on{background:var(--card2);color:var(--txt);box-shadow:0 1px 5px #0004}
+  .switch-btn.on.c-codex{border-color:rgba(91,141,239,.55)}
+  .switch-btn.on.c-zcode{border-color:rgba(224,182,79,.55)}
+  .switch-count{min-width:17px;padding:0 5px;border-radius:9px;background:rgba(144,137,124,.2);
+    color:var(--dim);font-size:10px;font-weight:500;text-align:center}
+  .switch-btn.on .switch-count{color:var(--txt)}
   .iconbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--card);
     color:var(--dim);cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center}
   .iconbtn:hover{color:var(--txt);border-color:var(--border2)}
@@ -157,7 +169,10 @@
 <div class="wrap">
   <div class="topbar">
     <div class="logo"><b>CODEX HELPER</b><span>额度监控与任务排程</span></div>
-    <span class="title">模型使用 · 额度水位 · 自动续跑</span>
+    <div class="switcher" role="tablist" aria-label="选择助手">
+      <button class="switch-btn c-codex" id="agentCodex" role="tab" aria-selected="true" onclick="switchAgent('codex')">Codex<span class="switch-count" id="codexCount" hidden></span></button>
+      <button class="switch-btn c-zcode" id="agentZcode" role="tab" aria-selected="false" onclick="switchAgent('zcode')">ZCode<span class="switch-count" id="zcodeCount" hidden></span></button>
+    </div>
     <div class="right">
       <span id="gen">加载中…</span>
       <button class="iconbtn" title="刷新当前页面" aria-label="刷新当前页面" onclick="refreshCurrentTab()">⟳</button>
@@ -173,14 +188,17 @@
   <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
 
   <div class="pagehead">
-    <h1>监控总览</h1>
+    <h1 id="ovTitle">Codex 监控总览</h1>
     <div class="chips" id="winBtns"></div>
-    <div class="chips" id="agentBtns" hidden></div>
   </div>
 
   <div class="cards" id="cards"></div>
 
   <div class="panel" id="quotaPanel"><h2>Codex 额度水位</h2><div id="quota"></div></div>
+
+  <div class="panel" id="zcodeNote" hidden><h2>ZCode 使用说明</h2>
+    <div style="color:var(--dim);font-size:12px;line-height:1.8">ZCode 按会话记录用量，没有账户级实时额度窗口，因此这里展示模型 / 项目 / 错误统计。<br>
+    想在闲时免费额度里批量跑任务？去 <a href="#zcode/sprint" style="color:var(--accent)">玩命蹬</a> 建一个时间窗口队列。</div></div>
 
   <div class="panel"><h2>会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
 
@@ -193,7 +211,7 @@
     <div class="panel"><h2>最近异常（含容量拒单）</h2><table id="tErr"></table></div>
   </div>
 
-  <div class="panel" id="probePanel"><h2>偷换探针（仅 Codex）
+  <div class="panel" id="probePanel"><h2>偷换探针
       <span id="pNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
@@ -213,14 +231,18 @@
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
-    <div class="schedule-head"><div><h1>任务监控与排程</h1><p>让 Codex / ZCode 在约定的时间或任务完成后继续工作。ZCode 任务中断后的续跑采用定时重试（无实时额度接口）。</p></div>
+    <div class="schedule-head"><div><h1 id="schedTitle">任务监控与排程</h1><p id="schedSub">让 Codex 在约定的时间或任务完成后继续工作。</p></div>
       <div class="schedule-summary" id="sSummary"></div></div>
     <div class="schedule-layout">
       <div>
-        <div class="schedule-panel">
+        <div class="schedule-panel" id="sAutoPanel">
           <label class="auto-row" for="sAuto"><span class="auto-copy"><b>额度恢复后自动续跑</b>
             <small>开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。</small></span>
             <input type="checkbox" class="switch" id="sAuto" onchange="setAutoResume()" aria-label="额度恢复后自动续跑"></label>
+        </div>
+        <div class="schedule-panel" id="zSchedNote" hidden>
+          <span class="auto-copy"><b>ZCode 续跑说明</b>
+            <small>ZCode 没有实时额度接口。勾选"续跑任务"后，任务因限流中断会每 5 分钟自动重试（最多 8 次），恢复后即接续原对话。</small></span>
         </div>
         <form class="schedule-panel" id="sForm" onsubmit="event.preventDefault();addSchedule()">
           <h2>创建一次性规则</h2><p class="sub">选择要做的事，填写触发条件和指令。</p>
@@ -232,7 +254,7 @@
           <input type="hidden" id="sKind" value="new">
           <div class="schedule-grid">
             <label class="schedule-field wide" id="sTriggerBox">何时运行<select id="sTrigger" onchange="scheduleFields()">
-              <option value="at">指定时间</option><option value="quota">下一次额度刷新后</option><option value="after">另一任务完成后</option></select></label>
+              <option value="at">指定时间</option><option value="quota" id="optQuota">下一次额度刷新后</option><option value="after">另一任务完成后</option></select></label>
             <div class="schedule-field wide" id="sTaskBox" hidden>
               <label class="schedule-field">项目<select id="sTaskProject" onchange="updateTaskOptions()"></select></label>
               <label class="schedule-field" style="margin-top:10px">具体任务（对话）<select id="sTask" onchange="updateTaskNote()"></select></label>
@@ -357,11 +379,6 @@ function modelBadge(m){
   const color=hit?hit[1]:'#9a948a';
   return `<span class="mbadge" style="background:${color}">${m}</span>`;
 }
-const AGENT_NAMES={codex:'Codex',zcode:'ZCode'};
-let agentSel='';
-const agentTag=a=>a==='zcode'
-  ?'<span class="badge" style="background:rgba(224,182,79,.12);color:var(--warn)">ZCode</span>'
-  :'<span class="badge" style="background:rgba(91,141,239,.14);color:var(--accent)">Codex</span>';
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
@@ -399,9 +416,8 @@ function render(d){
   const s=d.summary||{};
   const ps=d.probe_summary||{};
   const cov=d.coverage||{};
-  const agLine=(d.agents||[]).map(a=>`${AGENT_NAMES[a.agent]||a.agent} ${fmt(a.turns)}`).join(' · ');
   $('#cards').innerHTML=
-    `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮${agLine?' · '+agLine:''}</div></div>`+
+    `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮</div></div>`+
     `<div class="card"><div class="k">Token 输入</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">输出 ${fmtTok(s.tokens_out)} · 缓存命中 ${fmtTok(s.tokens_cached)}</div></div>`+
     `<div class="card"><div class="k">容量拒单</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">上游容量不足直接拒绝</div></div>`+
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
@@ -422,8 +438,8 @@ function render(d){
   charts.t?.destroy();charts.t=new Chart($('#cTrend'),tCfg);
   const models=d.models||[];
   const tot=models.reduce((a,m)=>a+m.turns,0)||1;
-  $('#tModel').innerHTML='<tr><th>模型</th><th>来源</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th></tr>'+
-    models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${agentTag(m.agent)}</td><td>${fmt(m.turns)}</td>
+  $('#tModel').innerHTML='<tr><th>模型</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th></tr>'+
+    models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${fmt(m.turns)}</td>
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
       <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td></tr>`).join('');
@@ -431,9 +447,8 @@ function render(d){
   $('#tProj').innerHTML='<tr><th>项目</th><th>轮次</th><th>tokens</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">暂无</td></tr>');
   const er=d.errors_recent||[];
-  $('#tErr').innerHTML='<tr><th>时间</th><th>模型</th><th>来源</th><th>类型</th><th>消息</th></tr>'+
+  $('#tErr').innerHTML='<tr><th>时间</th><th>模型</th><th>类型</th><th>消息</th></tr>'+
     (er.length?er.slice(0,12).map(e=>`<tr><td>${String(e.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(e.model)}</td>
-      <td>${agentTag(e.agent)}</td>
       <td><span class="badge ${e.error_kind==='capacity'||e.error_kind==='server_overloaded'?'b-bad':'b-warn'}">${e.error_kind}</span></td>
       <td style="text-align:left;color:var(--dim);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_msg||'').replace(/"/g,'')}">${e.error_msg||''}</td></tr>`).join(''):'<tr><td style="color:var(--ok)">没有错误 ✓</td></tr>');
   const probes=d.probes||[];
@@ -453,7 +468,7 @@ function render(d){
 
 async function load(){
   let d;
-  try{d=await(await fetch('/api/data?days='+Math.ceil(winSec/86400)+'&agent='+encodeURIComponent(agentSel))).json();}
+  try{d=await(await fetch('/api/data?days='+Math.ceil(winSec/86400)+'&agent='+encodeURIComponent(curAgent))).json();}
   catch(e){$('#gen').textContent='无法连接本地服务';return;}
   dLast=d;
   $('#gen').textContent='更新于 '+String(d.meta.generated_at||'').slice(0,19).replace('T',' ')+(d.meta.demo?' · 演示数据':'');
@@ -461,37 +476,55 @@ async function load(){
   $('#sAuto').disabled=!!d.meta.demo;
   $('#sSave').disabled=!!d.meta.demo;
   if(d.meta.demo)scheduleMessage('演示模式仅展示排程界面，无法保存规则。');
-  const enabled=d.meta.agents_enabled||[];
-  const multi=enabled.length>1;
-  const box=$('#agentBtns');
-  box.hidden=!multi;
-  if(multi){
-    const btns=[['','全部']].concat(enabled.map(a=>[a,AGENT_NAMES[a]||a]));
-    const key=btns.map(b=>b[0]).join('|');
-    if(box.dataset.key!==key){
-      box.dataset.key=key;
-      box.innerHTML=btns.map(([id,lab])=>`<button type="button" class="chip ${id===agentSel?'on':''}" data-agent="${id}" onclick="setAgent('${id}')">${lab}</button>`).join('');
-    }else{
-      box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.agent===agentSel));
-    }
-  }
-  $('#quotaPanel').hidden=!enabled.includes('codex');
-  $('#probePanel').hidden=!enabled.includes('codex');
+  const counts={};(d.agents||[]).forEach(a=>counts[a.agent]=a.turns);
+  [['codexCount','codex'],['zcodeCount','zcode']].forEach(([id,k])=>{
+    const el=$('#'+id);
+    if(counts[k]!=null){el.hidden=false;el.textContent=fmt(counts[k]);}
+  });
   if(!$('#view-overview').hidden)render(d);
 }
-function setAgent(a){
-  agentSel=a;
-  document.querySelectorAll('#agentBtns .chip').forEach(x=>x.classList.toggle('on',x.dataset.agent===a));
-  load();
-}
 
+let curAgent='codex';
+try{const saved=localStorage.getItem('cmw-agent');if(saved==='codex'||saved==='zcode')curAgent=saved;}catch(e){}
+let curTab='overview';
+function applyAgentFrame(){
+  const z=curAgent==='zcode';
+  $('#agentCodex').classList.toggle('on',!z);
+  $('#agentCodex').setAttribute('aria-selected',String(!z));
+  $('#agentZcode').classList.toggle('on',z);
+  $('#agentZcode').setAttribute('aria-selected',String(z));
+  $('#tab-sprint').hidden=!z;
+  $('#ovTitle').textContent=z?'ZCode 监控总览':'Codex 监控总览';
+  $('#quotaPanel').hidden=z;
+  $('#probePanel').hidden=z;
+  $('#zcodeNote').hidden=!z;
+  $('#schedSub').textContent=z
+    ?'让 ZCode 在约定时间或任务完成后继续工作；中断续跑采用定时重试。'
+    :'让 Codex 在约定的时间或任务完成后继续工作。';
+  $('#sAutoPanel').hidden=z;
+  $('#zSchedNote').hidden=!z;
+  $('#optQuota').hidden=z;
+  if(z&&$('#sTrigger').value==='quota'){$('#sTrigger').value='at';scheduleFields();}
+  try{document.title=z?'ZCode · Codex Helper':'Codex Helper';}catch(e){}
+}
+function switchAgent(a){
+  if(a===curAgent){setTab(curTab);return;}
+  curAgent=a;
+  try{localStorage.setItem('cmw-agent',a);}catch(e){}
+  if(a==='codex'&&curTab==='sprint')curTab='overview';
+  applyAgentFrame();
+  load();
+  setTab(curTab);
+}
 function setTab(name,updateHash=true){
-  const names=['overview','schedule','sprint'];
-  names.forEach(n=>{
+  if(name==='sprint'&&curAgent!=='zcode')name='overview';
+  curTab=name;
+  ['overview','schedule','sprint'].forEach(n=>{
     $('#view-'+n).hidden=n!==name;
     $('#tab-'+n).setAttribute('aria-selected',String(n===name));
   });
-  if(updateHash&&location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+  const hash='#'+curAgent+(name==='overview'?'':'/'+name);
+  if(updateHash&&location.hash!==hash)history.replaceState(null,'',hash);
   if(name==='overview'&&dLast)render(dLast);
   if(name==='schedule')loadSchedule();
   if(name==='sprint')loadSprint();
@@ -499,21 +532,29 @@ function setTab(name,updateHash=true){
 function handleTabKey(event){
   if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
   event.preventDefault();
-  const order=['overview','schedule','sprint'];
-  const target=event.key==='ArrowRight'?order[(order.indexOf(document.activeElement.id.replace('tab-',''))+1)%3]:
-    event.key==='ArrowLeft'?order[(order.indexOf(document.activeElement.id.replace('tab-',''))+2)%3]:
-    event.key==='Home'?'overview':'sprint';
+  const visible=['overview','schedule'].concat(curAgent==='zcode'?['sprint']:[]);
+  const current=visible.indexOf(curTab);
+  const target=event.key==='ArrowRight'||event.key==='End'?visible[event.key==='End'?visible.length-1:(current+1)%visible.length]:
+    event.key==='ArrowLeft'||event.key==='Home'?visible[event.key==='Home'?0:(current+visible.length-1)%visible.length]:curTab;
   setTab(target);$('#tab-'+target).focus();
 }
 function refreshCurrentTab(){
-  if(!$('#view-sprint').hidden)loadSprint();
-  else if(!$('#view-schedule').hidden)loadSchedule();
+  if(curTab==='sprint')loadSprint();
+  else if(curTab==='schedule')loadSchedule();
   else load();
 }
-window.addEventListener('hashchange',()=>{
-  const h=location.hash.replace('#','');
-  setTab(['overview','schedule','sprint'].includes(h)?h:'overview',false);
-});
+function applyHash(h){
+  const parts=h.replace(/^#\/?/,'').split('/');
+  let a=parts[0],t=parts[1]||'overview';
+  if(a!=='codex'&&a!=='zcode')a=curAgent;
+  if(!['overview','schedule','sprint'].includes(t))t='overview';
+  if(t==='sprint'&&a!=='zcode')t='overview';
+  const changed=a!==curAgent;
+  curAgent=a;
+  if(changed)applyAgentFrame();
+  setTab(t,false);
+}
+window.addEventListener('hashchange',()=>applyHash(location.hash));
 
 function setWin(sec){
   winSec=sec;
@@ -654,7 +695,7 @@ function renderScheduleQueue(){
     const targetName=target?(target.title||target.id).slice(0,48):r.thread_id?.slice(0,8)||'';
     const projectName=r.kind==='new'?(r.project_name||''):'';
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(label)}</span>
-      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.agent==='zcode'?agentTag('zcode'):''}${r.auto?'<span class="hint">自动监控</span>':''}
+      <b>${esc(ruleKind[r.kind]||r.kind)}</b>${r.auto?'<span class="hint">自动监控</span>':''}
       ${r.status==='waiting'?`<button type="button" onclick="cancelSchedule('${esc(r.id)}')">取消</button>`:''}</div>
       <div class="prompt">${esc(r.prompt)}</div>
       <div class="meta">${esc(triggerText(r))}${projectName?' · 项目 '+esc(projectName):''}${targetName?' · 任务 '+esc(targetName):''}</div>
@@ -662,8 +703,14 @@ function renderScheduleQueue(){
       ${r.output?`<div class="meta">任务 ID：${esc(r.output)}</div>`:''}</article>`;
   }).join('')||`<div class="empty-state">${ruleFilter==='history'?'还没有执行记录':'队列为空。创建规则后会在这里显示。'}</div>`;
 }
+function filterScheduleData(d,agent){
+  const isAgent=x=>(x.agent||'codex')===agent;
+  return {rules:(d.rules||[]).filter(isAgent),tasks:(d.tasks||[]).filter(isAgent),
+          projects:d.projects||[],auto_resume:d.auto_resume,quota_error:d.quota_error};
+}
 async function loadSchedule(){
-  try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error('读取失败');scheduleData=await response.json();}
+  try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error('读取失败');
+    scheduleData=filterScheduleData(await response.json(),curAgent);}
   catch(e){$('#sQuotaError').hidden=false;$('#sQuotaError').textContent='排程队列暂时无法更新';return;}
   $('#sAuto').checked=!!scheduleData.auto_resume;
   updateProjectOptions();
@@ -694,7 +741,7 @@ async function addSchedule(){
     runAt=when.toISOString();
   }
   const body={kind,trigger,thread_id:$('#sTask').value,prompt,run_at:runAt,
-    agent:kind==='new'&&$('#sProject').value.startsWith('zcode-dir:')?'zcode':'codex',
+    agent:curAgent,
     project_mode:kind==='new'?projectMode:null,project_id:$('#sProject').value,
     project_name:$('#sProjectName').value,project_parent:$('#sProjectParent').value};
   const button=$('#sSave');button.disabled=true;button.textContent='保存中…';scheduleMessage('正在保存规则');
@@ -817,7 +864,10 @@ $('#sTime').value=new Date(initialTime.getTime()-initialTime.getTimezoneOffset()
 const spInit=new Date(Date.now()+1800000);
 $('#spStartAt').value=new Date(spInit.getTime()-spInit.getTimezoneOffset()*60000).toISOString().slice(0,16);
 $('#spEndAt').value=new Date((spInit.getTime()+7200000)-spInit.getTimezoneOffset()*60000).toISOString().slice(0,16);
-setTab(location.hash==='#schedule'?'schedule':location.hash==='#sprint'?'sprint':'overview',false);
+if(location.hash.startsWith('#codex')||location.hash.startsWith('#zcode'))applyHash(location.hash);
+else if(location.hash==='#schedule')setTab('schedule',false);
+else if(location.hash==='#sprint'){curAgent='zcode';applyAgentFrame();setTab('sprint',false);}
+else applyAgentFrame();
 scheduleFields();loadSchedule();loadSprint();load();
 setInterval(load,30000);setInterval(loadSchedule,5000);setInterval(loadSprint,5000);
 </script>

@@ -6,7 +6,9 @@ const html = fs.readFileSync(require('path').join(__dirname, '..', 'web', 'index
 const markup = html.split('<script>')[0];
 const ids = [...markup.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 assert.strictEqual(ids.length, new Set(ids).size, 'HTML IDs must be unique');
-for (const id of ['tab-overview', 'tab-schedule', 'view-overview', 'view-schedule', 'sList']) {
+for (const id of ['tab-overview', 'tab-schedule', 'tab-sprint', 'view-overview', 'view-schedule',
+                  'view-sprint', 'sList', 'agentCodex', 'agentZcode', 'quotaPanel', 'probePanel',
+                  'zcodeNote', 'sAutoPanel', 'zSchedNote', 'optQuota']) {
   assert(ids.includes(id), `Missing ${id}`);
 }
 
@@ -42,6 +44,27 @@ vm.runInContext("setTab('schedule')", context);
 assert.strictEqual(element('#view-overview').hidden, true);
 assert.strictEqual(element('#view-schedule').hidden, false);
 assert.strictEqual(element('#tab-schedule')['aria-selected'], 'true');
+// agent 切换：ZCode 空间隐藏 Codex 专属面板、显示玩命蹬
+vm.runInContext("switchAgent('zcode')", context);
+assert.strictEqual(element('#quotaPanel').hidden, true);
+assert.strictEqual(element('#probePanel').hidden, true);
+assert.strictEqual(element('#zcodeNote').hidden, false);
+assert.strictEqual(element('#sAutoPanel').hidden, true);
+assert.strictEqual(element('#zSchedNote').hidden, false);
+assert.strictEqual(element('#tab-sprint').hidden, false);
+assert.strictEqual(element('#optQuota').hidden, true);
+assert.strictEqual(element('#agentZcode')['aria-selected'], 'true');
+vm.runInContext("setTab('sprint')", context);
+assert.strictEqual(element('#view-sprint').hidden, false);
+vm.runInContext("switchAgent('codex')", context);
+assert.strictEqual(element('#quotaPanel').hidden, false);
+assert.strictEqual(element('#tab-sprint').hidden, true);
+assert.strictEqual(element('#view-overview').hidden, false);  // codex 无 sprint，回落总览
+// 排程数据按 agent 过滤
+const filterResult = vm.runInContext(`scheduleData=filterScheduleData({rules:[{id:'a',agent:'codex'},{id:'b',agent:'zcode'}],
+  tasks:[{id:'t1',agent:'zcode'},{id:'t2',agent:'codex'}],projects:[{id:'p'}]},'zcode'),
+  scheduleData.rules.map(r=>r.id).join(',')+'|'+scheduleData.tasks.map(t=>t.id).join(',')`, context);
+assert.strictEqual(filterResult, 'b|t1');
 vm.runInContext(`scheduleData={tasks:[],rules:[
   {id:'a',kind:'new',trigger:'at',run_at:200,created_at:1,status:'waiting',prompt:'Second task'},
   {id:'b',kind:'next',trigger:'after',created_at:2,status:'running',prompt:'Running task'},
