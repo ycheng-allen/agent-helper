@@ -223,5 +223,60 @@ class SprintRunTest(unittest.TestCase):
         self.assertEqual("failed", row[0])
 
 
+class SprintCreateProjectTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def base(self, **kw):
+        body = {"kind": "once", "project_mode": "create",
+                "project_name": "fresh-" + self.id()[-8:],
+                "project_parent": self.tmp.name,
+                "concurrency": 1, "prompts": ["t1"],
+                "start_at": iso(time.time()), "end_at": iso(time.time() + 3600)}
+        body.update(kw)
+        return body
+
+    def test_create_project_cwd_and_fields(self):
+        sp = validate_sprint(self.base())
+        self.assertEqual("create", sp["project_mode"])
+        self.assertTrue(sp["cwd"].startswith(os.path.realpath(self.tmp.name)))
+        self.assertFalse(os.path.isdir(sp["cwd"]))  # 触发前不建目录
+
+    def test_create_project_rejects_existing_dir(self):
+        body = self.base(project_name="already")
+        os.makedirs(os.path.join(self.tmp.name, "already"))
+        with self.assertRaises(ValueError):
+            validate_sprint(body)
+
+    def test_create_project_rejects_bad_name(self):
+        with self.assertRaises(ValueError):
+            validate_sprint(self.base(project_name="a/b"))
+        with self.assertRaises(ValueError):
+            validate_sprint(self.base(project_parent="/nonexistent-dir-xyz"))
+
+    def test_launch_creates_project_dir(self):
+        import threading as th
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        init_db(conn)
+        s = Scheduler(conn, th.Lock(), os.path.join(self.tmp.name, "cx"),
+                      zcode_home=os.path.join(self.tmp.name, "zc"), agents=["zcode"])
+        sp = validate_sprint(self.base())
+        sp["id"] = "spc"
+        tasks = sp["tasks"]
+        insert_sprint(conn, sp, tasks)
+        procs = []
+        with patch("watch_scheduler.zcode_cmd", return_value=["node", "/f.cjs"]), \
+             patch("watch_scheduler.zcode_env", return_value=({"Z": "1"}, "")), \
+             patch("watch_scheduler.subprocess.Popen",
+                   side_effect=lambda cmd, **kw: procs.append(FakeProc()) or FakeProc()):
+            s.launch_sprint_task(sp, tasks[0])
+            time.sleep(0.3)
+        self.assertTrue(os.path.isdir(sp["cwd"]))
+        row = conn.execute("SELECT COUNT(*) FROM helper_projects").fetchone()[0]
+        self.assertEqual(1, row)
+
+
 if __name__ == "__main__":
     unittest.main()

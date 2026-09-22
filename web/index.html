@@ -130,6 +130,22 @@
   .schedule-filter{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
   .schedule-filter button{border:1px solid var(--border2);background:transparent;border-radius:7px;color:var(--dim);padding:4px 10px;font:inherit;font-size:11px;cursor:pointer}
   .schedule-filter button.active{background:var(--card2);color:var(--txt)}
+  .sp-task{display:flex;gap:7px;align-items:flex-start;margin-bottom:7px}
+  .sp-task .idx{flex:none;min-width:22px;height:26px;border-radius:6px;background:var(--card2);
+    border:1px solid var(--border2);color:var(--dim);font-size:11px;display:flex;
+    align-items:center;justify-content:center;margin-top:2px;padding:0 4px}
+  .sp-task textarea{flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--txt);
+    border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;min-height:38px;resize:vertical;
+    line-height:1.45;outline:none}
+  .sp-task textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(91,141,239,.16)}
+  .sp-task .ops{flex:none;display:flex;flex-direction:column;gap:3px}
+  .sp-task .ops button{border:1px solid var(--border2);background:transparent;color:var(--dim);
+    border-radius:5px;font-size:10px;cursor:pointer;padding:1px 6px}
+  .sp-task .ops button:hover{color:var(--txt);border-color:var(--dim)}
+  .sp-task .ops button.del:hover{color:var(--fail);border-color:var(--fail)}
+  .sp-addtask{border:1px dashed var(--border2);background:transparent;color:var(--dim);
+    border-radius:8px;padding:7px 14px;font:inherit;font-size:12px;cursor:pointer;width:100%}
+  .sp-addtask:hover{color:var(--txt);border-color:var(--dim)}
   .empty-state{color:var(--dim);padding:25px 12px;text-align:center;font-size:12px;border:1px dashed var(--border2);border-radius:8px}
   .squares{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 14px}
   .sq{width:14px;height:14px;border-radius:3px;background:rgba(144,137,124,.15)}
@@ -325,9 +341,26 @@
             </div>
             <label class="schedule-field">并行数<input type="number" id="spConcurrency" min="1" max="6" value="1">
               <span class="field-note">1 = 串行；N = 最多 N 个同时跑（上限 6）。</span></label>
-            <label class="schedule-field">工作目录<select id="spProject"></select>
+            <div class="schedule-field" id="spProjectModeBox">任务项目
+              <div class="project-options" role="group" aria-label="项目来源">
+                <button type="button" class="kind-option active" data-sp-mode="existing" onclick="chooseSprintProjectMode('existing')">现有目录</button>
+                <button type="button" class="kind-option" data-sp-mode="create" onclick="chooseSprintProjectMode('create')">新建项目</button>
+              </div><input type="hidden" id="spProjectMode" value="existing"></div>
+            <label class="schedule-field wide" id="spExistingBox">现有目录<select id="spProject"></select>
               <span class="field-note">队列中所有任务都在此目录执行。</span></label>
-            <label class="schedule-field wide">任务队列（每行一个 Prompt）<textarea id="spPrompts" placeholder="第一行会最先执行；最多 50 行" style="min-height:150px"></textarea></label>
+            <div class="schedule-field wide" id="spNewBox" hidden>
+              <div style="display:flex;gap:10px">
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px">新文件夹名称<input id="spProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px">保存位置<input id="spProjectParent" list="spParents" placeholder="例如 /Users/你/Projects" autocomplete="off"></label>
+              </div>
+              <datalist id="spParents"></datalist>
+              <span class="field-note">窗口首个任务启动时创建目录并登记为本地项目。</span>
+            </div>
+            <div class="schedule-field wide">任务队列
+              <div id="spTaskList"></div>
+              <button type="button" class="sp-addtask" onclick="addSprintTask()">＋ 添加任务</button>
+              <span class="field-note">每个任务有独立的 Prompt，按顺序执行（并行时按序占用空槽）；最多 50 个。</span>
+            </div>
           </div>
           <div class="schedule-form-actions"><button type="submit" class="primary-action" id="spSave">创建窗口</button>
             <span class="hint">到点自动停止全部任务 · 可随时手动停止</span></div>
@@ -768,6 +801,52 @@ async function setAutoResume(){
 
 let sprintData={sprints:[],tasks:{},projects:[]};
 let sprintKind='daily';
+let spProjectMode='existing';
+function chooseSprintProjectMode(mode){
+  spProjectMode=mode;$('#spProjectMode').value=mode;
+  document.querySelectorAll('[data-sp-mode]').forEach(b=>b.classList.toggle('active',b.dataset.spMode===mode));
+  $('#spExistingBox').hidden=mode!=='existing';
+  $('#spNewBox').hidden=mode!=='create';
+}
+const escAttr=esc;
+function addSprintTask(prompt=''){
+  const list=$('#spTaskList');
+  if(list.children.length>=50){sprintMessage('最多 50 个任务','error');return;}
+  const row=document.createElement('div');
+  row.className='sp-task';
+  const promptEsc=esc(prompt);
+  row.innerHTML=`<span class="idx"></span>
+    <textarea placeholder="这个任务的 Prompt，例如：修复登录页的样式问题并写一个回归测试">${promptEsc}</textarea>
+    <span class="ops">
+      <button type="button" title="上移" onclick="moveSprintTask(this,-1)">↑</button>
+      <button type="button" title="下移" onclick="moveSprintTask(this,1)">↓</button>
+      <button type="button" class="del" title="删除" onclick="removeSprintTask(this)">✕</button>
+    </span>`;
+  list.appendChild(row);
+  renumberSprintTasks();
+}
+function removeSprintTask(btn){
+  const list=$('#spTaskList');
+  if(list.children.length<=1){sprintMessage('至少保留一个任务（可清空内容，保存时忽略空行）');return;}
+  btn.closest('.sp-task').remove();
+  renumberSprintTasks();
+}
+function moveSprintTask(btn,dir){
+  const row=btn.closest('.sp-task');
+  if(dir<0&&row.previousElementSibling)row.parentNode.insertBefore(row,row.previousElementSibling);
+  if(dir>0&&row.nextElementSibling)row.parentNode.insertBefore(row.nextElementSibling,row);
+  renumberSprintTasks();
+}
+function renumberSprintTasks(){
+  [...$('#spTaskList').children].forEach((row,i)=>{
+    row.querySelector('.idx').textContent=i+1;
+  });
+}
+function sprintTaskPrompts(){
+  return [...$('#spTaskList').children]
+    .map(row=>row.querySelector('textarea').value.trim())
+    .filter(Boolean);
+}
 function chooseSprintKind(kind){
   sprintKind=kind;$('#spKind').value=kind;
   document.querySelectorAll('[data-sp-kind]').forEach(b=>b.classList.toggle('active',b.dataset.spKind===kind));
@@ -780,6 +859,12 @@ function updateSprintProjects(){
   sel.innerHTML='<option value="">'+(projects.length?'选择工作目录':'暂无可用目录')+'</option>'+
     projects.map(p=>`<option value="${esc(p.path)}">${esc(p.name)} · ${esc(p.path)}</option>`).join('');
   if(projects.some(p=>p.path===chosen))sel.value=chosen;
+  const parents=[...new Set(projects.map(p=>p.path.slice(0,p.path.lastIndexOf('/'))).filter(Boolean))];
+  $('#spParents').innerHTML=parents.map(path=>`<option value="${escAttr(path)}"></option>`).join('');
+  const parentInput=$('#spProjectParent');
+  if(!parentInput.value&&!parentInput.dataset.suggested&&parents.length){
+    parentInput.value=parents[0];parentInput.dataset.suggested='true';
+  }
 }
 function sprintStateText(s){
   if(s.status==='stopped')return '已手动停止';
@@ -828,11 +913,18 @@ function sprintMessage(message,kind=''){
   const el=$('#spMessage');el.textContent=message;el.className='schedule-message'+(kind?' '+kind:'');
 }
 async function createSprint(){
-  const prompts=$('#spPrompts').value.split('\n').map(x=>x.trim()).filter(Boolean);
-  if(!prompts.length){sprintMessage('请填写至少一个任务','error');return;}
-  if(!$('#spProject').value){sprintMessage('请选择工作目录','error');return;}
+  const prompts=sprintTaskPrompts();
+  if(!prompts.length){sprintMessage('请至少填写一个任务的 Prompt','error');return;}
   const body={kind:sprintKind,agent:'zcode',prompts,
-    cwd:$('#spProject').value,concurrency:parseInt($('#spConcurrency').value||'1',10)};
+    project_mode:spProjectMode,concurrency:parseInt($('#spConcurrency').value||'1',10)};
+  if(spProjectMode==='existing'){
+    body.cwd=$('#spProject').value;
+    if(!body.cwd){sprintMessage('请选择现有目录','error');$('#spProject').focus();return;}
+  }else{
+    body.project_name=$('#spProjectName').value.trim();
+    body.project_parent=$('#spProjectParent').value.trim();
+    if(!body.project_name||!body.project_parent){sprintMessage('请填写新文件夹名称和保存位置','error');return;}
+  }
   if(sprintKind==='daily'){body.start_hm=$('#spStartHm').value;body.end_hm=$('#spEndHm').value;
     if(!body.start_hm||!body.end_hm){sprintMessage('请填写每日起止时间','error');return;}}
   else{
@@ -844,7 +936,12 @@ async function createSprint(){
   try{
     const r=await(await fetch('/api/sprint',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)})).json();
-    if(!r.error){sprintMessage(`已创建：${r.task_count} 个任务入队`,'success');$('#spPrompts').value='';loadSprint();}
+    if(!r.error){
+      sprintMessage(`已创建：${r.task_count} 个任务入队`,'success');
+      $('#spTaskList').innerHTML='';
+      addSprintTask();
+      loadSprint();
+    }
     else sprintMessage(r.error,'error');
   }catch(e){sprintMessage(String(e.message||e),'error');}
   finally{btn.disabled=false;btn.textContent='创建窗口';}
@@ -868,6 +965,7 @@ if(location.hash.startsWith('#codex')||location.hash.startsWith('#zcode'))applyH
 else if(location.hash==='#schedule')setTab('schedule',false);
 else if(location.hash==='#sprint'){curAgent='zcode';applyAgentFrame();setTab('sprint',false);}
 else applyAgentFrame();
+addSprintTask();
 scheduleFields();loadSchedule();loadSprint();load();
 setInterval(load,30000);setInterval(loadSchedule,5000);setInterval(loadSprint,5000);
 </script>

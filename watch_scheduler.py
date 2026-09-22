@@ -561,7 +561,12 @@ def init_db(conn):
         id TEXT PRIMARY KEY, name TEXT, agent TEXT DEFAULT 'zcode',
         kind TEXT, start_hm TEXT, end_hm TEXT, start_at REAL, end_at REAL,
         cwd TEXT, concurrency INTEGER DEFAULT 1,
+        project_mode TEXT, project_name TEXT, project_parent TEXT,
         status TEXT DEFAULT 'waiting', created_at REAL, stopped_at REAL)""")
+    sprint_cols = {row[1] for row in conn.execute("PRAGMA table_info(sprints)")}
+    for col in ("project_mode", "project_name", "project_parent"):
+        if col not in sprint_cols:
+            conn.execute("ALTER TABLE sprints ADD COLUMN " + col + " TEXT")
     conn.execute("""CREATE TABLE IF NOT EXISTS sprint_tasks(
         id TEXT PRIMARY KEY, sprint_id TEXT, prompt TEXT, position INTEGER,
         status TEXT DEFAULT 'pending', session_id TEXT, error TEXT, output TEXT,
@@ -625,14 +630,29 @@ def sprint_window(sp, now=None):
     return min((c for c in cands if c[0] > now), key=lambda c: c[0])
 
 
-def validate_sprint(body, projects):
+def validate_sprint(body, projects=None):
     kind = body.get("kind")
     if kind not in ("daily", "once"):
         raise ValueError("请选择窗口类型（每日或一次性）")
-    cwd_input = str(body.get("cwd") or "").strip()
-    cwd = os.path.realpath(os.path.expanduser(cwd_input)) if cwd_input else ""
-    if not os.path.isdir(cwd):
-        raise ValueError("请选择任务工作目录")
+    project_mode = body.get("project_mode") if body.get("project_mode") in ("existing", "create") else "existing"
+    project_name = project_parent = None
+    if project_mode == "create":
+        project_name = str(body.get("project_name") or "").strip()
+        parent_input = str(body.get("project_parent") or "").strip()
+        project_parent = os.path.realpath(os.path.expanduser(parent_input)) if parent_input else ""
+        if (not project_name or len(project_name) > 80 or project_name in (".", "..") or
+                re.search(r"[\x00-\x1f/\\:]", project_name)):
+            raise ValueError("新项目名称不能包含路径分隔符或控制字符，且不超过 80 字")
+        if not os.path.isdir(project_parent):
+            raise ValueError("项目保存位置不存在")
+        cwd = os.path.join(project_parent, project_name)
+        if os.path.lexists(cwd):
+            raise ValueError("该项目目录已存在；请选择现有目录或更换名称")
+    else:
+        cwd_input = str(body.get("cwd") or "").strip()
+        cwd = os.path.realpath(os.path.expanduser(cwd_input)) if cwd_input else ""
+        if not os.path.isdir(cwd):
+            raise ValueError("请选择任务工作目录")
     try:
         concurrency = int(body.get("concurrency") or 1)
     except (TypeError, ValueError):
@@ -647,6 +667,7 @@ def validate_sprint(body, projects):
         raise ValueError("单个任务 Prompt 不能超过 20000 字")
     sp = {"id": str(uuid.uuid4()), "name": str(body.get("name") or "").strip()[:60] or "玩命蹬",
           "agent": "zcode", "kind": kind, "cwd": cwd, "concurrency": concurrency,
+          "project_mode": project_mode, "project_name": project_name, "project_parent": project_parent,
           "status": "waiting", "created_at": time.time(), "stopped_at": None,
           "start_hm": None, "end_hm": None, "start_at": None, "end_at": None}
     if kind == "daily":
@@ -827,6 +848,22 @@ class Scheduler:
     def launch_sprint_task(self, sp, task):
         base = zcode_cmd()
         env, env_error = zcode_env()
+        if sp.get("project_mode") == "create" and not os.path.isdir(sp["cwd"]):
+            try:
+                os.makedirs(sp["cwd"], exist_ok=True)
+                with self.lock:
+                    self.conn.execute(
+                        "INSERT OR IGNORE INTO helper_projects(id,name,path,created_at) VALUES(?,?,?,?)",
+                        ("helper-" + sp["id"], sp.get("project_name") or os.path.basename(sp["cwd"]),
+                         sp["cwd"], time.time()))
+                    self.conn.commit()
+            except OSError as exc:
+                with self.lock:
+                    self.conn.execute(
+                        "UPDATE sprint_tasks SET status='failed', error=?, finished_at=? WHERE id=?",
+                        ("创建项目目录失败: " + str(exc)[:200], time.time(), task["id"]))
+                    self.conn.commit()
+                return
         if base is None or env is None:
             with self.lock:
                 self.conn.execute(

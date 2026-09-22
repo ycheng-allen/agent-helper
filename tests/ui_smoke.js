@@ -18,8 +18,12 @@ const elements = new Map();
 function element(key) {
   if (!elements.has(key)) elements.set(key, {
     value: '', hidden: false, innerHTML: '', textContent: '', dataset: {},
+    children: [],
     classList: { add() {}, remove() {}, toggle() {} },
     setAttribute(name, value) { this[name] = value; }, focus() {},
+    appendChild(child) { this.children.push(child); },
+    closest() { return null; },
+    querySelector(sel) { return element(sel); },
   });
   return elements.get(key);
 }
@@ -27,7 +31,8 @@ element('#sKind').value = 'new';
 element('#sTrigger').value = 'at';
 const context = {
   console, Date, Map, String, Number, JSON, Math, Promise, Intl,
-  document: { querySelector: element, querySelectorAll: () => [] },
+  document: { querySelector: element, querySelectorAll: () => [],
+              createElement: tag => element('<' + tag + '>') },
   window: { addEventListener() {} },
   location: { hash: '' }, history: { replaceState() {} },
   fetch: async () => { throw Error('offline smoke test'); },
