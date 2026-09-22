@@ -425,30 +425,37 @@ def run_probe(codex_home, model):
 # 2026-09 采集；cached 缺省按输入价 10%。可被 ~/.codex-model-watch/pricing.json 覆盖：
 # {"usd_cny": 7.1, "rates": {"模型前缀": {"in":x,"cached":y,"out":z,"currency":"usd|cny"}}}
 PRICING_USD_CNY = 7.1
+# 每个模型给出其有刊价市场的原生生牌价（每 1M tokens）：
+#   OpenAI 仅 usd；智谱国内 cny、国际(Z.ai) usd —— 两个市场价格不同，按展示语言取口径。
+# cached 缺省按输入价 10%~20%。采集于 2026-09（openai.com/api/pricing、bigmodel.cn、docs.z.ai）。
 PRICING_RATES = [
-    # (前缀, 输入, 缓存输入, 输出, 币种)  前缀最长者优先
-    ("gpt-5.6-sol", 4.0, 0.40, 20.0, "usd"),
-    ("gpt-5.6-terra", 2.0, 0.20, 12.0, "usd"),
-    ("gpt-5.6-luna", 0.20, 0.02, 1.20, "usd"),
-    ("gpt-5.6", 2.0, 0.20, 12.0, "usd"),
-    ("gpt-6-astra", 4.0, 0.40, 20.0, "usd"),      # 未见于牌价，按旗舰档估
-    ("gpt-6", 4.0, 0.40, 20.0, "usd"),
-    ("gpt-5.5", 5.0, 0.50, 30.0, "usd"),
-    ("gpt-5.4", 2.5, 0.25, 15.0, "usd"),
-    ("gpt-5", 1.25, 0.125, 10.0, "usd"),
-    ("codex-auto-review", 0.0, 0.0, 0.0, "usd"),  # Codex 内部审查模型
-    ("glm-5.3-flash", 0.8, 0.16, 2.8, "cny"),
-    ("glm-5.3", 8.0, 1.6, 28.0, "cny"),
-    ("glm-5.2", 8.0, 1.6, 28.0, "cny"),
-    ("glm-5", 8.0, 1.6, 28.0, "cny"),
-    ("glm-4.7", 2.0, 0.4, 8.0, "cny"),
-    ("glm-4", 2.0, 0.4, 8.0, "cny"),
+    # (前缀, {"cny": (入,缓存,出)|None, "usd": (...)|None})  前缀最长者优先
+    ("gpt-5.6-sol", {"usd": (4.0, 0.40, 20.0)}),
+    ("gpt-5.6-terra", {"usd": (2.0, 0.20, 12.0)}),
+    ("gpt-5.6-luna", {"usd": (0.20, 0.02, 1.20)}),
+    ("gpt-5.6", {"usd": (2.0, 0.20, 12.0)}),
+    ("gpt-6-astra", {"usd": (4.0, 0.40, 20.0)}),      # 未见于牌价，按旗舰档估
+    ("gpt-6", {"usd": (4.0, 0.40, 20.0)}),
+    ("gpt-5.5", {"usd": (5.0, 0.50, 30.0)}),
+    ("gpt-5.4", {"usd": (2.5, 0.25, 15.0)}),
+    ("gpt-5", {"usd": (1.25, 0.125, 10.0)}),
+    ("codex-auto-review", {"usd": (0.0, 0.0, 0.0)}),  # Codex 内部审查模型
+    ("glm-5.3-flash", {"cny": (0.8, 0.16, 2.8), "usd": (0.15, 0.03, 0.50)}),
+    ("glm-5.3", {"cny": (8.0, 1.6, 28.0), "usd": (1.40, 0.26, 4.40)}),
+    ("glm-5.2", {"cny": (8.0, 1.6, 28.0), "usd": (1.40, 0.26, 4.40)}),
+    ("glm-5", {"cny": (8.0, 1.6, 28.0), "usd": (1.40, 0.26, 4.40)}),
+    ("glm-4.7", {"cny": (2.0, 0.4, 8.0), "usd": (0.60, 0.12, 2.20)}),
+    ("glm-4", {"cny": (2.0, 0.4, 8.0), "usd": (0.60, 0.12, 2.20)}),
 ]
 _pricing_cache = {}
 
 
 def load_pricing():
-    """Embedded rates merged with the user's optional pricing.json override."""
+    """Embedded rates merged with the user's optional pricing.json override.
+
+    Override format: {"usd_cny": 7.1, "rates": {"prefix": {"in":x,"cached":y,"out":z,
+    "currency":"usd|cny"}}} or {"prefix": {"cny":[i,c,o],"usd":[i,c,o]}}.
+    """
     if _pricing_cache:
         return _pricing_cache["data"]
     rates = list(PRICING_RATES)
@@ -458,13 +465,17 @@ def load_pricing():
         try:
             cfg = json.load(open(path, encoding="utf-8"))
             usd_cny = float(cfg.get("usd_cny", usd_cny))
-            overrides = cfg.get("rates") or {}
             merged = {p[0]: p for p in rates}
-            for prefix, r in overrides.items():
-                merged[prefix.lower()] = (prefix.lower(), float(r.get("in", 0)),
-                                          float(r.get("cached", r.get("in", 0) * 0.1)),
-                                          float(r.get("out", 0)), r.get("currency", "usd"))
-            rates = sorted(merged.values(), key=lambda p: -len(p[0]))
+            for prefix, r in (cfg.get("rates") or {}).items():
+                prefix = prefix.lower()
+                if "cny" in r or "usd" in r:
+                    entry = {"cny": tuple(r.get("cny") or ()), "usd": tuple(r.get("usd") or ())}
+                else:
+                    cur = r.get("currency", "usd")
+                    entry = {cur: (float(r.get("in", 0)), float(r.get("cached", r.get("in", 0) * 0.1)),
+                                   float(r.get("out", 0)))}
+                merged[prefix] = (prefix, entry)
+            rates = list(merged.values())
         except Exception:
             pass
     rates.sort(key=lambda p: -len(p[0]))
@@ -473,28 +484,40 @@ def load_pricing():
 
 
 def model_price(model):
-    """Match a model id to a rate entry; None when unpriced."""
+    """Match a model id to rate entries {"cny": tuple|None, "usd": tuple|None}; None when unpriced."""
     rates, _ = load_pricing()
     low = (model or "").lower()
-    for prefix, pin, pcached, pout, currency in rates:
+    for prefix, entry in rates:
         if low.startswith(prefix):
-            return {"in": pin, "cached": pcached, "out": pout, "currency": currency}
+            return {"cny": entry.get("cny") or None, "usd": entry.get("usd") or None}
     return None
 
 
-def price_tokens(model, tin, tcached, tout, usd_cny):
-    """Cost of one aggregate row; None when the model is unpriced.
+def price_tokens(model, tin, tcached, tout):
+    """Native-currency cost of one aggregate row.
 
-    in_tokens already includes cached tokens, so fresh input is billed at
-    the full rate and cached at the cached rate.
+    in_tokens already includes cached tokens: fresh input is billed at the
+    full rate, cached at the cached rate. Returns {"usd": x, "cny": y}
+    (only the markets where the model is priced), or None when unpriced.
     """
     p = model_price(model)
-    if not p:
+    if not p or not (p["cny"] or p["usd"]):
         return None
     fresh = max(0, (tin or 0) - (tcached or 0))
-    amount = ((fresh * p["in"]) + (tcached or 0) * p["cached"] + (tout or 0) * p["out"]) / 1e6
-    return {"amount": round(amount, 4), "currency": p["currency"],
-            "cny": round(amount * (usd_cny if p["currency"] == "usd" else 1.0), 4)}
+    out = {}
+    for cur, rate in p.items():
+        if rate:
+            out[cur] = round((fresh * rate[0] + (tcached or 0) * rate[1] + (tout or 0) * rate[2]) / 1e6, 4)
+    return out
+
+
+def clear_probes(conn, agent):
+    """Delete probe history for one agent ('codex'|'zcode'); returns rowcount."""
+    if agent not in ("codex", "zcode"):
+        raise ValueError("agent 必须是 codex 或 zcode")
+    cur = conn.execute("DELETE FROM probes WHERE agent=?", (agent,))
+    conn.commit()
+    return cur.rowcount
 
 
 def month_cutoff():
@@ -505,29 +528,45 @@ def month_cutoff():
 
 
 def compute_cost(conn, agent, cutoff, until=""):
-    """Aggregate token cost for one agent (or both when agent=''); range [cutoff, until)."""
-    _, usd_cny = load_pricing()
+    """Aggregate token cost for one agent (or both when agent=''); range [cutoff, until).
+
+    Returns native-currency sums: "usd" (USD-priced models, e.g. OpenAI) and
+    "cny" (CNY-priced models, e.g. Zhipu domestic). No conversion here — the
+    UI converts per display language.
+    """
     cond = {"c": cutoff, "u": until, "a": agent}
     rows = conn.execute("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent,
                                   COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(cached_tokens),0) tcached,
                                   COALESCE(SUM(out_tokens),0) tout, COUNT(*) turns
                            FROM turns WHERE (:c='' OR ts>=:c) AND (:u='' OR ts<:u) AND (:a='' OR agent=:a)
                            GROUP BY model, agent ORDER BY tin DESC""", cond).fetchall()
-    result = {"usd": 0.0, "cny": 0.0, "unpriced_tokens": 0, "models": []}
+    _, usd_cny = load_pricing()
+    result = {"usd": 0.0, "cny": 0.0, "unpriced_tokens": 0, "models": [],
+              "cny_total": 0.0, "usd_total": 0.0}
     for r in rows:
-        cost = price_tokens(r["model"], r["tin"], r["tcached"], r["tout"], usd_cny)
-        if cost is None:
+        p = model_price(r["model"])
+        if not p or not (p["cny"] or p["usd"]):
             result["unpriced_tokens"] += (r["tin"] or 0) + (r["tout"] or 0)
             continue
-        result["usd"] += cost["amount"] if cost["currency"] == "usd" else 0.0
-        result["cny"] += cost["cny"]
+        fresh = max(0, (r["tin"] or 0) - (r["tcached"] or 0))
+        native = {cur: round((fresh * rate[0] + (r["tcached"] or 0) * rate[1]
+                              + (r["tout"] or 0) * rate[2]) / 1e6, 4)
+                  for cur, rate in p.items() if rate}
+        # 两种展示口径：CH 全部 ¥（usd 按汇率折），EN 全部 $（cny 按汇率折）
+        if p["cny"]:
+            result["cny"] += native["cny"]
+            result["cny_total"] += native["cny"]
+            result["usd_total"] += native["cny"] / usd_cny
+        else:
+            result["usd"] += native["usd"]
+            result["usd_total"] += native["usd"]
+            result["cny_total"] += native["usd"] * usd_cny
         result["models"].append({"model": r["model"], "agent": r["agent"], "turns": r["turns"],
                                  "tin": r["tin"], "tout": r["tout"],
-                                 "cost": cost["amount"], "currency": cost["currency"]})
-    result["usd"] = round(result["usd"], 2)
-    result["cny"] = round(result["cny"], 2)
-    result["total_cny"] = round(result["usd"] * usd_cny + result["cny"], 2)
-    result["models"].sort(key=lambda m: -m["cost"])
+                                 "native_usd": native.get("usd"), "native_cny": native.get("cny")})
+    for key in ("usd", "cny", "cny_total", "usd_total"):
+        result[key] = round(result[key], 2)
+    result["models"].sort(key=lambda m: -(m["native_usd"] or 0) - (m["native_cny"] or 0))
     return result
 
 
@@ -542,7 +581,7 @@ def prev_month_cutoff():
 
 def api_overview(conn):
     """Aggregate cross-agent statistics for the 全局总览 dashboard."""
-    _, usd_cny = load_pricing()
+    usd_cny = load_pricing()[1]
     mc, pc = month_cutoff(), prev_month_cutoff()
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -570,16 +609,24 @@ def api_overview(conn):
                                     COALESCE(SUM(out_tokens),0) tout
                              FROM turns WHERE ts>=? AND ts IS NOT NULL
                              GROUP BY d, agent, served""", (d30,)):
-        c = price_tokens(r["served"], r["tin"], r["tcached"], r["tout"], usd_cny)
+        c = price_tokens(r["served"], r["tin"], r["tcached"], r["tout"])
+        p = model_price(r["served"])
         key = (r["d"], r["agent"])
         if c:
-            priced[key] = priced.get(key, 0.0) + c["cny"]
+            acc = priced.setdefault(key, {"usd": 0.0, "cny": 0.0})
+            if p.get("cny"):
+                acc["cny"] += c["cny"]
+                acc["usd"] += c["cny"] / usd_cny
+            else:
+                acc["usd"] += c["usd"]
+                acc["cny"] += c["usd"] * usd_cny
     for item in daily:
-        item["cost_cny"] = round(priced.get((item["date"], item["agent"]), 0.0), 2)
+        acc = priced.get((item["date"], item["agent"]), {"usd": 0.0, "cny": 0.0})
+        item["cost_usd"] = round(acc["usd"], 2)
+        item["cost_cny"] = round(acc["cny"], 2)
 
     return {"generated_at": iso_now(), "usd_cny": usd_cny,
-            "month": month, "prev_month": {"usd": prev["usd"], "cny": prev["cny"],
-                                           "total_cny": prev["total_cny"]},
+            "month": month, "prev_month": {"usd": prev["usd"], "cny": prev["cny"]},
             "per_agent": per_agent,
             "totals": {"turns": totals["turns"], "tokens_in": totals["tin"],
                        "tokens_out": totals["tout"], "tokens_cached": totals["tcached"],
@@ -662,15 +709,6 @@ def run_zcode_probe(model, timeout=180):
             "latency_ms": latency, "error": error}
 
 
-def clear_probes(conn, agent):
-    """Delete probe history for one agent ('codex'|'zcode'); returns rowcount."""
-    if agent not in ("codex", "zcode"):
-        raise ValueError("agent 必须是 codex 或 zcode")
-    cur = conn.execute("DELETE FROM probes WHERE agent=?", (agent,))
-    conn.commit()
-    return cur.rowcount
-
-
 # ---------------------------------------------------------------- 聚合输出
 
 def api_data(conn, days=0, agent="", win_sec=None):
@@ -724,11 +762,12 @@ def api_data(conn, days=0, agent="", win_sec=None):
                                     FROM probes WHERE (:a='' OR agent=:a)""",
                                   {"a": agent}).fetchone()
     total_models = sum(m["turns"] for m in models) or 1
-    _, usd_cny = load_pricing()
     for m in models:
         m["share"] = round(m["turns"] * 100.0 / total_models, 1)
-        m["cost"] = price_tokens(m["model"], m["tin"], m["tcached"], m["tout"], usd_cny)
+        cost = price_tokens(m["model"], m["tin"], m["tcached"], m["tout"])
+        m["cost"] = cost  # {"usd":x,"cny":y} native amounts
     cost_month = compute_cost(conn, agent, month_cutoff())
+    _, usd_cny = load_pricing()
     return {
         "meta": {"generated_at": iso_now(), "demo": g_state["demo"],
                  "agents_enabled": (g_args.agents if g_args else ["codex", "zcode"])},

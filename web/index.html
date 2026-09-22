@@ -191,23 +191,24 @@
 <body>
 <div class="wrap">
   <div class="topbar">
-    <div class="logo"><b>AGENT HELPER</b><span>额度监控与任务排程</span></div>
+    <div class="logo"><b>AGENT HELPER</b><span data-i18n="subtitle">额度监控与任务排程</span></div>
     <div class="switcher" role="tablist" aria-label="选择空间">
       <button class="switch-btn c-all" id="spaceAll" role="tab" aria-selected="false" onclick="switchAgent('all')">总览</button>
       <button class="switch-btn c-codex" id="agentCodex" role="tab" aria-selected="true" onclick="switchAgent('codex')">Codex<span class="switch-count" id="codexCount" hidden></span></button>
       <button class="switch-btn c-zcode" id="agentZcode" role="tab" aria-selected="false" onclick="switchAgent('zcode')">ZCode<span class="switch-count" id="zcodeCount" hidden></span></button>
     </div>
     <div class="right">
+      <button class="iconbtn" id="langBtn" title="EN / 中文" onclick="setLang(LANG==='en'?'ch':'en')" style="font-size:11px;width:auto;padding:0 8px">EN</button>
       <span id="gen">加载中…</span>
       <button class="iconbtn" title="刷新当前页面" aria-label="刷新当前页面" onclick="refreshCurrentTab()">⟳</button>
     </div>
   </div>
   <div id="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
   <nav class="tabs" role="tablist" aria-label="主导航" onkeydown="handleTabKey(event)">
-    <button class="tab" id="tab-stats" role="tab" aria-controls="view-stats" aria-selected="false" onclick="setTab('stats')">统计总览</button>
-    <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')">监控总览</button>
-    <button class="tab" id="tab-schedule" role="tab" aria-controls="view-schedule" aria-selected="false" onclick="setTab('schedule')">任务排程 <span class="tab-count" id="sTabCount" hidden></span></button>
-    <button class="tab" id="tab-sprint" role="tab" aria-controls="view-sprint" aria-selected="false" onclick="setTab('sprint')">玩命蹬 <span class="tab-count" id="spTabCount" hidden></span></button>
+    <button class="tab" id="tab-stats" role="tab" aria-controls="view-stats" aria-selected="false" onclick="setTab('stats')"><span data-i18n="stats">统计总览</span></button>
+    <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')"><span data-i18n="overview">监控总览</span></button>
+    <button class="tab" id="tab-schedule" role="tab" aria-controls="view-schedule" aria-selected="false" onclick="setTab('schedule')"><span data-i18n="schedule">任务排程</span> <span class="tab-count" id="sTabCount" hidden></span></button>
+    <button class="tab" id="tab-sprint" role="tab" aria-controls="view-sprint" aria-selected="false" onclick="setTab('sprint')"><span data-i18n="sprint">玩命蹬</span> <span class="tab-count" id="spTabCount" hidden></span></button>
   </nav>
 
   <section id="view-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
@@ -216,16 +217,16 @@
 
   <div class="cards" id="statCards"></div>
 
-  <div class="panel"><h2>每日费用趋势（¥，按 agent 堆叠）</h2><canvas id="cDailyCost"></canvas></div>
+  <div class="panel"><h2 data-i18n="dailyCost">每日费用趋势（¥，按 agent 堆叠）</h2><canvas id="cDailyCost"></canvas></div>
 
-  <div class="panel"><h2>每日 Token 用量（输入+输出，按 agent）</h2><canvas id="cDailyTok"></canvas></div>
+  <div class="panel"><h2 data-i18n="dailyTok">每日 Token 用量（输入+输出，按 agent）</h2><canvas id="cDailyTok"></canvas></div>
 
   <div class="grid2">
-    <div class="panel"><h2>本月费用构成</h2><canvas id="cAgentShare"></canvas></div>
-    <div class="panel"><h2>本月概览</h2><table id="tMonth"></table></div>
+    <div class="panel"><h2 data-i18n="share">本月费用构成</h2><canvas id="cAgentShare"></canvas></div>
+    <div class="panel"><h2 data-i18n="monthTable">本月概览</h2><table id="tMonth"></table></div>
   </div>
 
-  <div class="panel"><h2>本月模型费用明细</h2><div style="overflow-x:auto"><table id="tStatModels"></table></div></div>
+  <div class="panel"><h2 data-i18n="modelDetail">本月模型费用明细</h2><div style="overflow-x:auto"><table id="tStatModels"></table></div></div>
 
   <div class="foot">费用为公开 API 牌价折算（汇率可在 ~/.codex-model-watch/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
   </section>
@@ -239,27 +240,27 @@
 
   <div class="cards" id="cards"></div>
 
-  <div class="panel" id="quotaPanel"><h2 id="quotaTitle">额度水位</h2><div id="quota"></div></div>
+  <div class="panel" id="quotaPanel"><h2 id="quotaTitle" data-i18n="quotaTitle">额度水位</h2><div id="quota"></div></div>
 
-  <div class="panel"><h2>会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
+  <div class="panel"><h2 data-i18n="trendTitle">会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
 
-  <div class="panel"><h2>模型使用统计</h2>
+  <div class="panel"><h2 data-i18n="modelTitle">模型使用统计</h2>
     <div style="overflow-x:auto"><table id="tModel"></table></div>
   </div>
 
   <div class="grid2">
-    <div class="panel"><h2>项目分布</h2><table id="tProj"></table></div>
-    <div class="panel"><h2>最近异常（含容量拒单）</h2><table id="tErr"></table></div>
+    <div class="panel"><h2 data-i18n="projTitle">项目分布</h2><table id="tProj"></table></div>
+    <div class="panel"><h2 data-i18n="errTitle">最近异常（含容量拒单）</h2><table id="tErr"></table></div>
   </div>
 
-  <div class="panel" id="probePanel"><h2>偷换探针
+  <div class="panel" id="probePanel"><h2 data-i18n="probeTitle">偷换探针
       <span id="pNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
       <span class="hint">请求模型</span>
       <input class="pmodel" id="pModel" placeholder="例如 gpt-6-astra">
-      <button class="pgo" id="pGo" onclick="runProbe()">立即探测</button>
-      <button class="pgo" onclick="clearProbe('codex')">清除历史</button>
+      <button class="pgo" id="pGo" onclick="runProbe()" data-i18n="probeGo">立即探测</button>
+      <button class="pgo" onclick="clearProbe('codex')" data-i18n="clearHist">清除历史</button>
       <span class="hint">用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度</span>
     </div>
     <div id="probeOut"></div>
@@ -268,7 +269,7 @@
     <div style="overflow-x:auto"><table id="tProbe"></table></div>
   </div>
 
-  <div class="panel" id="zprobePanel"><h2>模型探针（ZCode）
+  <div class="panel" id="zprobePanel"><h2 data-i18n="probeTitle">模型探针（ZCode）
       <span id="zpNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
     </h2>
     <div class="toolbar">
@@ -277,8 +278,8 @@
         <option value="GLM-5.3">GLM-5.3</option>
         <option value="GLM-5.3-Flash">GLM-5.3-Flash</option>
       </select>
-      <button class="pgo" id="zpGo" onclick="runZProbe()">立即探测</button>
-      <button class="pgo" onclick="clearProbe('zcode')">清除历史</button>
+      <button class="pgo" id="zpGo" onclick="runZProbe()" data-i18n="probeGo">立即探测</button>
+      <button class="pgo" onclick="clearProbe('zcode')" data-i18n="clearHist">清除历史</button>
       <span class="hint">用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度</span>
     </div>
     <div id="zpOut" style="margin:8px 0;font-size:12.5px;min-height:20px"></div>
@@ -344,9 +345,9 @@
       <div class="schedule-panel">
         <h2>Schedule 队列</h2><p class="sub">等待中的规则按计划时间展示；触发条件满足后开始执行。</p>
         <div class="schedule-filter" id="sFilters" role="group" aria-label="筛选排程规则">
-          <button type="button" class="active" data-filter="active" onclick="setRuleFilter('active')">进行中</button>
-          <button type="button" data-filter="history" onclick="setRuleFilter('history')">历史</button>
-          <button type="button" data-filter="all" onclick="setRuleFilter('all')">全部</button>
+          <button type="button" class="active" data-filter="active" onclick="setRuleFilter('active')" data-i18n="fActive">进行中</button>
+          <button type="button" data-filter="history" onclick="setRuleFilter('history')" data-i18n="fHistory">历史</button>
+          <button type="button" data-filter="all" onclick="setRuleFilter('all')" data-i18n="fAll">全部</button>
         </div>
         <div id="sQuotaError" class="schedule-message error" role="status" hidden></div>
         <div id="sList" class="schedule-list"></div>
@@ -356,7 +357,7 @@
   </section>
 
   <section id="view-sprint" role="tabpanel" aria-labelledby="tab-sprint" hidden>
-    <div class="schedule-head"><div><h1>免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。</p></div>
+    <div class="schedule-head"><div><h1 data-i18n="sprintHead">免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。</p></div>
       <div class="schedule-summary" id="spSummary"><button type="button" class="primary-action" id="spStopAll" onclick="stopAllSprints()" hidden style="background:var(--fail);border-color:var(--fail)">中止全部</button></div></div>
     <div class="schedule-layout">
       <div>
@@ -455,11 +456,128 @@ function modelBadge(m){
   const color=hit?hit[1]:'#9a948a';
   return `<span class="mbadge" style="background:${color}">${m}</span>`;
 }
+let LANG='ch';
+try{LANG=localStorage.getItem('cmw-lang')==='en'?'en':'ch';}catch(e){}
+const I18N={
+  // tabs / chrome
+  stats:{ch:'统计总览',en:'Usage Stats'}, overview:{ch:'监控总览',en:'Monitor'},
+  schedule:{ch:'任务排程',en:'Schedule'}, sprint:{ch:'玩命蹬',en:'Sprint'},
+  subtitle:{ch:'额度监控与任务排程',en:'Quota monitor & task scheduler'},
+  // overview cards
+  turns:{ch:'会话轮次',en:'Turns'}, totalTurns:{ch:'历史累计',en:'all-time'},
+  costMonth:{ch:'本月等价费用',en:'Est. cost this month'},
+  approx:{ch:'≈',en:'≈'}, rate:{ch:'汇率',en:'rate'}, unpriced:{ch:'未计价',en:'unpriced'},
+  tok:{ch:'tok',en:'tok'},
+  tokenIn:{ch:'Token 输入',en:'Input tokens'}, tokenOut:{ch:'输出',en:'output'}, cacheHit:{ch:'缓存命中',en:'cached'},
+  capacity:{ch:'容量拒单',en:'Capacity rejects'}, capacitySub:{ch:'上游容量不足直接拒绝',en:'rejected upstream'},
+  otherErr:{ch:'其他错误',en:'Other errors'}, otherErrSub:{ch:'限流 / 网络等',en:'rate limit / network'},
+  avgTurn:{ch:'平均轮时长',en:'Avg turn'}, avgTurnSub:{ch:'含工具调用',en:'incl. tools'},
+  swapCnt:{ch:'探针偷换',en:'Probe swaps'}, swapCntSub:{ch:'共',en:'of'},
+  // panels
+  quotaTitle:{ch:'额度水位',en:'Quota'},
+  trendTitle:{ch:'会话轮次 / 错误 · 按小时趋势',en:'Turns / errors · hourly'},
+  modelTitle:{ch:'模型使用统计',en:'Model usage'},
+  projTitle:{ch:'项目分布',en:'Projects'}, errTitle:{ch:'最近异常（含容量拒单）',en:'Recent errors'},
+  probeTitle:{ch:'偷换探针',en:'Swap probe'},
+  probeGo:{ch:'立即探测',en:'Probe now'}, clearHist:{ch:'清除历史',en:'Clear history'},
+  reqModel:{ch:'请求模型',en:'Request model'},
+  matched:{ch:'一致',en:'Matched'}, swapped:{ch:'被偷换',en:'Swapped'}, failed:{ch:'失败',en:'Failed'},
+  noProbe:{ch:'还没有探测记录',en:'No probes yet'},
+  // schedule
+  schedHead:{ch:'任务监控与排程',en:'Tasks & scheduling'},
+  autoResume:{ch:'额度恢复后自动续跑',en:'Auto-resume on quota'},
+  zResume:{ch:'ZCode 续跑说明',en:'ZCode resume'},
+  newRule:{ch:'创建一次性规则',en:'New one-shot rule'},
+  startNew:{ch:'启动新任务',en:'New task'}, sendNext:{ch:'发送下一步',en:'Follow-up'}, resumeTask:{ch:'续跑任务',en:'Resume'},
+  taskCmd:{ch:'任务指令',en:'Prompt'},
+  saveRule:{ch:'保存规则',en:'Save rule'}, queue:{ch:'Schedule 队列',en:'Schedule queue'},
+  // sprint
+  sprintHead:{ch:'免费玩命蹬',en:'Free Sprint'},
+  sprintQueue:{ch:'任务队列',en:'Task queue'},
+  addTask:{ch:'＋ 添加任务',en:'＋ Add task'},
+  start:{ch:'开始',en:'Start'}, stop:{ch:'中止',en:'Stop'}, del:{ch:'删除',en:'Delete'},
+  stopAll:{ch:'中止全部',en:'Stop all'},
+  // stats
+  statTotal:{ch:'本月合计费用',en:'Total this month'},
+  statCodex:{ch:'Codex 费用',en:'Codex cost'}, statZcode:{ch:'ZCode 费用',en:'ZCode cost'},
+  statTokens:{ch:'本月 Tokens',en:'Tokens this month'},
+  statTurns:{ch:'本月轮次',en:'Turns this month'},
+  dailyCost:{ch:'每日费用趋势（按 agent 堆叠）',en:'Daily cost by agent'},
+  dailyTok:{ch:'每日 Token 用量（按 agent）',en:'Daily tokens by agent'},
+  share:{ch:'本月费用构成',en:'Cost share'},
+  monthTable:{ch:'本月概览',en:'Month summary'},
+  modelDetail:{ch:'本月模型费用明细',en:'Model cost detail'},
+  // tables
+  thModel:{ch:'模型',en:'Model'}, thTurns:{ch:'轮次',en:'Turns'}, thShare:{ch:'占比',en:'Share'},
+  thIn:{ch:'输入 tok',en:'In tok'}, thOut:{ch:'输出 tok',en:'Out tok'}, thAvg:{ch:'平均时长',en:'Avg'},
+  thErr:{ch:'错误',en:'Errors'}, thCost:{ch:'费用',en:'Cost'}, thSource:{ch:'来源',en:'Agent'},
+  thTime:{ch:'时间',en:'Time'}, thType:{ch:'类型',en:'Type'}, thMsg:{ch:'消息',en:'Message'},
+  thResult:{ch:'结果',en:'Result'}, thLatency:{ch:'耗时',en:'Latency'}, thReq:{ch:'请求模型',en:'Requested'},
+  thServed:{ch:'实际派出',en:'Served'}, thProj:{ch:'项目',en:'Project'}, thTok:{ch:'tokens',en:'tokens'},
+  thItem:{ch:'项目',en:'Item'}, thMonth:{ch:'本月',en:'This month'},
+  stActive:{ch:'运行中',en:'Running'}, stDone:{ch:'已完成',en:'Completed'}, stFailed:{ch:'失败',en:'Failed'},
+  stStopped:{ch:'7 天无更新',en:'Stale'}, stWaiting:{ch:'等待中',en:'Waiting'},
+  stRunning:{ch:'执行中',en:'Running'}, stCancelled:{ch:'已取消',en:'Cancelled'}, stCheck:{ch:'需检查',en:'Check'},
+  kindNew:{ch:'新任务',en:'New task'}, kindNext:{ch:'下一步',en:'Follow-up'}, kindResume:{ch:'续跑任务',en:'Resume'},
+  fActive:{ch:'进行中',en:'Active'}, fHistory:{ch:'历史',en:'History'}, fAll:{ch:'全部',en:'All'},
+  resetAt:{ch:'重置',en:'resets'}, usedPct:{ch:'已用',en:'used'}, afterH:{ch:'h 后重置',en:'h to reset'},
+  srcLiveCodex:{ch:'Codex 账户实时数据',en:'Codex live account data'},
+  srcLiveZcode:{ch:'ZCode 账户实时数据',en:'ZCode live account data'},
+  srcLog:{ch:'最近一次日志记录（非实时）',en:'last log record (not live)'},
+  srcWait:{ch:'暂无采样（等待后台读取 ZCode 额度）',en:'no sample yet (waiting for ZCode quota read)'},
+  sampled:{ch:'采样时间',en:'sampled'}, readFail:{ch:'实时读取失败',en:'live read failed'},
+  pendingQueue:{ch:'待跑队列（可拖动排序）',en:'Pending queue (drag to reorder)'},
+  queueEmpty:{ch:'队列已空',en:'Queue empty'},
+  costNote:{ch:'费用为公开 API 牌价折算（汇率可在 ~/.codex-model-watch/pricing.json 调整），非实际账单；每日趋势取最近 30 天。',
+            en:'Costs are converted at public API list rates (tune rate in ~/.codex-model-watch/pricing.json); not an actual bill. Daily trend covers the last 30 days.'},
+  r30:{ch:'最近 30 天',en:'Last 30 days'}, rMonth:{ch:'本月',en:'This month'},
+  trigNow:{ch:'立即执行',en:'Run now'}, trigAt:{ch:'指定时间',en:'At time'},
+  trigQuotaNew:{ch:'额度刷新后 · 预计',en:'After quota reset · est.'},
+  trigQuotaResume:{ch:'额度恢复后',en:'When quota recovers'},
+  trigRetry:{ch:'中断后定时重试',en:'Retry after interruption'},
+  trigAfter:{ch:'关联任务完成后',en:'After related task'},
+  spStopped:{ch:'已手动停止',en:'Stopped'}, spEnded:{ch:'已结束',en:'Finished'},
+  spWait:{ch:'等待窗口开启',en:'Waiting for window'}, spClosing:{ch:'收尾中',en:'Closing'},
+  parallel:{ch:'并行',en:'parallel'}, serial:{ch:'串行',en:'serial'},
+  finishedN:{ch:'完成',en:'done'},
+  waitingN:{ch:'等待',en:'waiting'}, runningN:{ch:'执行中',en:'running'},
+  costYen:{ch:'Codex 费用',en:'Codex cost'},
+  monthTableRowCodex:{ch:'Codex 费用',en:'Codex cost'},
+  monthTableRowZcode:{ch:'ZCode 费用',en:'ZCode cost'},
+  monthTableRowTotal:{ch:'合计（¥/$）',en:'Total ($ / ¥)'},
+  monthTableRowTurns:{ch:'轮次 / 错误',en:'Turns / errors'},
+  monthTableRowSampled:{ch:'采样时间',en:'sampled'},
+  skippedN:{ch:'跳过',en:'skipped'}, stoppedN:{ch:'停止',en:'stopped'},
+  noData:{ch:'本月暂无数据',en:'No data this month'},
+  schedSubC:{ch:'让 Codex 在约定的时间或任务完成后继续工作。',en:'Let Codex continue work at a set time, after quota recovers, or when another task finishes.'},
+  schedSubZ:{ch:'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。',en:'Let ZCode continue work at a set time or when a task finishes; interrupted resumes wait for live quota.'},
+};
+function t(key){const e=I18N[key];return e?(LANG==='en'?e.en:e.ch):key;}
+function setLang(lang){
+  LANG=lang==='en'?'en':'ch';
+  try{localStorage.setItem('cmw-lang',LANG);}catch(e){}
+  const btn=document.getElementById('langBtn');
+  if(btn)btn.textContent=LANG==='en'?'中文':'EN';
+  applyI18n();
+  if(dLast)render(dLast);
+  loadSchedule();loadSprint();loadStats();
+}
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n);});
+  const st=document.getElementById('statBtns');
+  if(st)st.dataset.built='';
+}
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
 const fmtMoney=(n,currency='cny')=>{
   const v=n>=100?String(Math.round(n)):n.toFixed(2);
   return (currency==='usd'?'$':'¥')+v;
 };
+function fmtNative(modelRow){
+  if(!modelRow)return '—';
+  if(modelRow.native_usd!=null)return fmtMoney(modelRow.native_usd,'usd');
+  if(modelRow.native_cny!=null)return fmtMoney(modelRow.native_cny,'cny');
+  return '—';
+}
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
 function renderQuota(quota,agent='codex'){
@@ -472,8 +590,8 @@ function renderQuota(quota,agent='codex'){
   const used=name=>live?(live[name]||{}).usedPercent:logged[name+'_used'];
   const reset=window=>{
     const at=window.resetsAt??window.resets_at;
-    if(at)return '重置 '+new Date(at*1000).toLocaleString('zh-CN',{hour12:false});
-    if(window.reset_after_seconds!=null)return Math.round(window.reset_after_seconds/3600)+'h 后重置';
+    if(at)return t('resetAt')+' '+new Date(at*1000).toLocaleString(LANG==='en'?'en-US':'zh-CN',{hour12:false});
+    if(window.reset_after_seconds!=null)return Math.round(window.reset_after_seconds/3600)+' '+t('afterH');
     return '';
   };
   const bar=(tag,value,window)=>{
@@ -483,16 +601,16 @@ function renderQuota(quota,agent='codex'){
     return `<div class="qbar"><span class="tag">${tag} 剩余</span>`+
       `<span class="track"><span class="fill" style="width:${remaining}%;background:${color}"></span></span>`+
       `<span class="pct" style="color:${color}">${valid?Math.round(remaining)+'%':'?'}</span>`+
-      `<span class="hint">${valid?'已用 '+Math.round(Number(value))+'% · ':''}${reset(window)}</span></div>`;
+      `<span class="hint">${valid?t('usedPct')+' '+Math.round(Number(value))+'% · ':''}${reset(window)}</span></div>`;
   };
   const sample=new Date(live?live.sampled_at*1000:logged.ts);
   const stamp=Number.isNaN(sample.getTime())?'未知':sample.toLocaleString('zh-CN',{hour12:false});
-  const source=live?(agent==='zcode'?'ZCode 账户实时数据':'Codex 账户实时数据')
-    :(agent==='zcode'?'暂无采样（等待后台读取 ZCode 额度）':'最近一次日志记录（非实时）');
+  const source=live?(agent==='zcode'?t('srcLiveZcode'):t('srcLiveCodex'))
+    :(agent==='zcode'?t('srcWait'):t('srcLog'));
   const labels=agent==='zcode'?['5h','周']:['5h','7d'];
   qEl.innerHTML=bar(labels[0],used('primary'),p)+bar(labels[1],used('secondary'),sec)+
-    `<div class="hint" style="margin-top:4px">${source} · 采样时间 ${stamp}`+
-    (!live&&(agent==='zcode'?quota?.zcode?.error:quota?.error)?' · 实时读取失败：'+esc(agent==='zcode'?quota.zcode.error:quota.error):'')+'</div>';
+    `<div class="hint" style="margin-top:4px">${source} · ${t('sampled')} ${stamp}`+
+    (!live&&(agent==='zcode'?quota?.zcode?.error:quota?.error)?' · '+t('readFail')+': '+esc(agent==='zcode'?quota.zcode.error:quota.error):'')+'</div>';
 }
 
 function render(d){
@@ -500,19 +618,20 @@ function render(d){
   const ps=d.probe_summary||{};
   const cov=d.coverage||{};
   $('#cards').innerHTML=
-    `<div class="card"><div class="k">会话轮次</div><div class="v ac">${fmt(s.turns)}</div><div class="s">历史累计 ${fmt(cov.turns_total||0)} 轮</div></div>`+
+    `<div class="card"><div class="k">${t("turns")}</div><div class="v ac">${fmt(s.turns)}</div><div class="s">${t("totalTurns")} ${fmt(cov.turns_total||0)}</div></div>`+
     (()=>{const c=d.cost||{};const m=c.month||{};
       const codex=curAgent==='codex';
-      const big=codex?fmtMoney(m.usd||0,'usd'):fmtMoney(m.cny||0);
-      const parts=[];if(codex)parts.push(`≈ ¥${(m.cny||0).toFixed(2)}`);
-      if(m.unpriced_tokens)parts.push(`未计价 ${fmtTok(m.unpriced_tokens)} tok`);
-      return `<div class="card"><div class="k">本月等价费用</div><div class="v">${big}</div>
+      const big=codex?(LANG==='en'?fmtMoney(m.usd||0,'usd'):fmtMoney(m.cny_total||0))
+                     :(LANG==='en'?fmtMoney(m.usd_total||0,'usd'):fmtMoney(m.cny||0));
+      const parts=[];if(codex)parts.push(LANG==='en'?`≈ ¥${(m.cny_total||0).toFixed(2)}`:`$${(m.usd||0).toFixed(2)}`);
+      if(m.unpriced_tokens)parts.push(`${t('unpriced')} ${fmtTok(m.unpriced_tokens)} tok`);
+      return `<div class="card"><div class="k">${t("costMonth")}</div><div class="v">${big}</div>
         <div class="s">${parts.join(' · ')||'—'}</div></div>`;})()+
-    `<div class="card"><div class="k">Token 输入</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">输出 ${fmtTok(s.tokens_out)} · 缓存命中 ${fmtTok(s.tokens_cached)}</div></div>`+
-    `<div class="card"><div class="k">容量拒单</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">上游容量不足直接拒绝</div></div>`+
-    `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
-    `<div class="card"><div class="k">平均轮时长</div><div class="v">${fmtDur(s.avg_duration_ms)}</div><div class="s">含工具调用</div></div>`+
-    `<div class="card"><div class="k">探针偷换</div><div class="v ${ps.swapped?'fail':'ok'}">${fmt(ps.swapped||0)}</div><div class="s">共 ${fmt(ps.total||0)} 次探测</div></div>`;
+    `<div class="card"><div class="k">${t("tokenIn")}</div><div class="v">${fmtTok(s.tokens_in)}</div><div class="s">${t("tokenOut")} ${fmtTok(s.tokens_out)} · ${t("cacheHit")} ${fmtTok(s.tokens_cached)}</div></div>`+
+    `<div class="card"><div class="k">${t("capacity")}</div><div class="v ${s.capacity?'fail':''}">${fmt(s.capacity)}</div><div class="s">${t("capacitySub")}</div></div>`+
+    `<div class="card"><div class="k">${t("otherErr")}</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">${t("otherErrSub")}</div></div>`+
+    `<div class="card"><div class="k">${t("avgTurn")}</div><div class="v">${fmtDur(s.avg_duration_ms)}</div><div class="s">${t("avgTurnSub")}</div></div>`+
+    `<div class="card"><div class="k">${t("swapCnt")}</div><div class="v ${ps.swapped?'fail':'ok'}">${fmt(ps.swapped||0)}</div><div class="s">${t("swapCntSub")} ${fmt(ps.total||0)}</div></div>`;
   renderQuota(d.quota,curAgent);
   const h=d.hourly||[];
   const step=Math.max(1,Math.ceil(h.length/160));
@@ -528,29 +647,29 @@ function render(d){
   charts.t?.destroy();charts.t=new Chart($('#cTrend'),tCfg);
   const models=d.models||[];
   const tot=models.reduce((a,m)=>a+m.turns,0)||1;
-  $('#tModel').innerHTML='<tr><th>模型</th><th>轮次</th><th>占比</th><th>输入 tok</th><th>输出 tok</th><th>平均时长</th><th>错误</th><th>费用</th></tr>'+
+  $('#tModel').innerHTML='<tr><th>'+t('thModel')+'</th><th>'+t('thTurns')+'</th><th>'+t('thShare')+'</th><th>'+t('thIn')+'</th><th>'+t('thOut')+'</th><th>'+t('thAvg')+'</th><th>'+t('thErr')+'</th><th>'+t('thCost')+'</th></tr>'+
     models.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${fmt(m.turns)}</td>
       <td style="text-align:left"><span class="sharebar" style="width:${m.share||0}%"></span>${m.share||0}%</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td><td>${fmtDur(m.avg_dur)}</td>
       <td>${m.errors?`<span class="badge b-bad">${m.errors}</span>`:'0'}</td>
-      <td>${m.cost?fmtMoney(m.cost.amount,m.cost.currency):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
+      <td>${m.cost?fmtNative({native_usd:m.cost.usd,native_cny:m.cost.cny}):'<span style="color:var(--dim)">—</span>'}</td></tr>`).join('');
   const pr=d.projects||[];
-  $('#tProj').innerHTML='<tr><th>项目</th><th>轮次</th><th>tokens</th></tr>'+
+  $('#tProj').innerHTML='<tr><th>'+t('thProj')+'</th><th>'+t('thTurns')+'</th><th>'+t('thTok')+'</th></tr>'+
     (pr.length?pr.map(p=>`<tr><td>${p.project}</td><td>${fmt(p.turns)}</td><td>${fmtTok(p.tokens)}</td></tr>`).join(''):'<tr><td style="color:var(--dim)">暂无</td></tr>');
   const er=d.errors_recent||[];
-  $('#tErr').innerHTML='<tr><th>时间</th><th>模型</th><th>类型</th><th>消息</th></tr>'+
+  $('#tErr').innerHTML='<tr><th>'+t('thTime')+'</th><th>'+t('thModel')+'</th><th>'+t('thType')+'</th><th>'+t('thMsg')+'</th></tr>'+
     (er.length?er.slice(0,12).map(e=>`<tr><td>${String(e.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(e.model)}</td>
       <td><span class="badge ${e.error_kind==='capacity'||e.error_kind==='server_overloaded'?'b-bad':'b-warn'}">${e.error_kind}</span></td>
       <td style="text-align:left;color:var(--dim);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.error_msg||'').replace(/"/g,'')}">${e.error_msg||''}</td></tr>`).join(''):'<tr><td style="color:var(--ok)">没有错误 ✓</td></tr>');
   const probes=d.probes||[];
-  $('#pNote').textContent=`共 ${fmt(ps.total||0)} 次探测 · 偷换 ${fmt(ps.swapped||0)} 次`;
+  $('#pNote').textContent=`${t('swapCntSub')} ${fmt(ps.total||0)} · ${t('swapped')} ${fmt(ps.swapped||0)}`;
   $('#pSquares').innerHTML=probes.slice(0,60).reverse().map(p=>{
     const cls=p.swapped?'swap':(p.served?'ok':'err');
     const info=`${String(p.ts).slice(5,16).replace('T',' ')} · 请求 ${p.requested} → 实际 ${p.served||p.error||'?'}`;
     return `<span class="sq ${cls}" title="${info}"></span>`;}).join('')||'<span class="hint">还没有探测记录</span>';
   if(curAgent==='zcode'){
     $('#zpNote').textContent=`共 ${fmt(ps.total||0)} 次探测 · 偷换 ${fmt(ps.swapped||0)} 次`;
-    $('#tZProbe').innerHTML='<tr><th>时间</th><th>请求模型</th><th>实际派出</th><th>结果</th><th>耗时</th></tr>'+
+    $('#tZProbe').innerHTML='<tr><th>'+t('thTime')+'</th><th>'+t('thReq')+'</th><th>'+t('thServed')+'</th><th>'+t('thResult')+'</th><th>'+t('thLatency')+'</th></tr>'+
       (probes.length?probes.slice(0,10).map(p=>{
         const sw=p.swapped;
         return `<tr><td>${String(p.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(p.requested)}</td>
@@ -564,7 +683,7 @@ function render(d){
       const sw=p.swapped;
       return `<tr><td>${String(p.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(p.requested)}</td>
         <td style="color:${sw?'var(--fail)':'var(--ok)'}">${p.served||(p.error?'<span style="color:var(--dim)">'+(p.error||'').slice(0,40)+'</span>':'?')}</td>
-        <td>${sw?'<span class="badge b-bad">被偷换</span>':(p.served?'<span class="badge b-ok">一致</span>':'<span class="badge b-off">'+(p.error?'失败':'?')+'</span>')}</td>
+        <td>${sw?'<span class="badge b-bad">'+t('swapped')+'</span>':(p.served?'<span class="badge b-ok">'+t('matched')+'</span>':'<span class="badge b-off">'+(p.error?t('failed'):'?')+'</span>')}</td>
         <td>${p.latency_ms?fmtDur(p.latency_ms):'—'}</td></tr>`;}).join(''):'<tr><td style="color:var(--dim)">还没有探测记录 —— 在上面输入模型名点「立即探测」试试</td></tr>');
 }
 
@@ -729,9 +848,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 let scheduleData={rules:[],tasks:[]};
 let ruleFilter='active';
 let projectOptionsKey=null;
-const taskStatus={active:'运行中',completed:'已完成',failed:'失败',stopped:'7 天无更新'};
-const ruleStatus={waiting:'等待中',running:'执行中',done:'已完成',failed:'执行失败',cancelled:'已取消',unknown:'需检查'};
-const ruleKind={new:'新任务',next:'下一步',resume:'续跑任务'};
+const taskStatus={active:'stActive',completed:'stDone',failed:'stFailed',stopped:'stStopped'};
+const ruleStatus={waiting:'stWaiting',running:'stRunning',done:'stDone',failed:'stFailed',cancelled:'stCancelled',unknown:'stCheck'};
+const ruleKind={new:'kindNew',next:'kindNext',resume:'kindResume'};
+const tsLabel=s=>t(taskStatus[s]||s);
+const rsLabel=s=>t(ruleStatus[s]||s);
+const rkLabel=s=>t(ruleKind[s]||s);
 function chooseKind(kind){
   $('#sKind').value=kind;
   document.querySelectorAll('.kind-option').forEach(button=>button.classList.toggle('active',button.dataset.kind===kind));
@@ -790,7 +912,7 @@ function updateTaskOptions(){
   const shown=tasks.filter(t=>taskProjectKey(t)===projectKey);
   const chosen=$('#sTask').value;
   $('#sTask').innerHTML='<option value="">'+(projectKey?'选择具体任务':'请先选择项目')+'</option>'+shown.map(t=>
-    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(taskStatus[(t.turn||{}).status]||'状态未知')}</option>`).join('');
+    `<option value="${esc(t.id)}">${esc((t.title||'任务 '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(tsLabel((t.turn||{}).status))}</option>`).join('');
   if(shown.some(t=>t.id===chosen))$('#sTask').value=chosen;
   updateTaskNote();
 }
@@ -809,13 +931,13 @@ function setRuleFilter(filter){
   renderScheduleQueue();
 }
 function triggerText(rule){
-  if(rule.trigger==='immediate')return '立即执行';
-  if(rule.trigger==='at')return '指定时间 · '+new Date(rule.run_at*1000).toLocaleString();
+  if(rule.trigger==='immediate')return t('trigNow');
+  if(rule.trigger==='at')return t('trigAt')+' · '+new Date(rule.run_at*1000).toLocaleString();
   if(rule.trigger==='quota'){
-    if(rule.kind==='new'&&rule.quota_after)return '额度刷新后 · 预计 '+new Date(rule.quota_after*1000).toLocaleString();
-    return rule.agent==='zcode'?'中断后定时重试':'额度恢复后';
+    if(rule.kind==='new'&&rule.quota_after)return t('trigQuotaNew')+' '+new Date(rule.quota_after*1000).toLocaleString();
+    return rule.agent==='zcode'?t('trigRetry'):t('trigQuotaResume');
   }
-  return '关联任务完成后';
+  return t('trigAfter');
 }
 function renderScheduleQueue(){
   const rules=scheduleData.rules||[];
@@ -909,7 +1031,7 @@ async function setAutoResume(){
 
 let statsData=null;
 let statRange=30;
-const STAT_RANGES=[['最近 30 天',30],['本月',0]];
+const STAT_RANGES=[['r30',30],['rMonth',0]];
 async function loadStats(){
   try{statsData=await(await fetch('/api/overview')).json();}catch(e){return;}
   renderStats();
@@ -924,30 +1046,34 @@ function renderStats(){
   const el=$('#statBtns');
   if(!el.dataset.built){
     el.dataset.built='1';
-    el.innerHTML=STAT_RANGES.map(([l,d])=>`<button type="button" class="chip ${d===statRange?'on':''}" data-days="${d}" onclick="setStatRange(${d})">${l}</button>`).join('');
+    el.innerHTML=STAT_RANGES.map(([k,d])=>`<button type="button" class="chip ${d===statRange?'on':''}" data-days="${d}" onclick="setStatRange(${d})">${t(k)}</button>`).join('');
   }
   const s=statsData, month=s.month, prev=s.prev_month||{};
   const inWindow=d=>d===0||true; // 月卡固定本月；趋势图窗口由图表自身控制
-  const mom=prev.total_cny?(month.total_cny-prev.total_cny)/prev.total_cny*100:null;
   const agents=s.per_agent||{};
-  const unpricedSub=month.unpriced_tokens?` · 未计价 ${fmtTok(month.unpriced_tokens)} tok`:'';
+  const unpricedSub=month.unpriced_tokens?` · ${t('unpriced')} ${fmtTok(month.unpriced_tokens)} tok`:'';
+  const prevTotal=prev?(prev.cny_total||0):0;
+  const monthTotal=LANG==='en'?(month.usd_total||0):(month.cny_total||0);
+  const mom=prevTotal?(monthTotal-prevTotal)/prevTotal*100:null;
+  const curDisp=LANG==='en'?'usd':'cny';
   $('#statCards').innerHTML=
-    `<div class="card"><div class="k">本月合计费用</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(month.total_cny||0)}</div><div class="s">${prev.total_cny?`上月 ¥${(prev.total_cny).toFixed(2)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
-    `<div class="card"><div class="k">Codex 费用</div><div class="v">${fmtMoney((s.per_agent.codex||{}).usd||0,'usd')}</div><div class="s">≈ ¥${((s.per_agent.codex||{}).cny||0).toFixed(2)} · 汇率 ${s.usd_cny}</div></div>`+
-    `<div class="card"><div class="k">ZCode 费用</div><div class="v">${fmtMoney((s.per_agent.zcode||{}).cny||0)}</div><div class="s">GLM 官方牌价折算</div></div>`+
-    `<div class="card"><div class="k">本月 Tokens</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">输入 ${fmtTok(s.totals.tokens_in)} · 输出 ${fmtTok(s.totals.tokens_out)}</div></div>`+
-    `<div class="card"><div class="k">本月轮次</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">错误 ${fmt(s.totals.errors)} 次</div></div>`;
+    `<div class="card"><div class="k">${t('statTotal')}</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(monthTotal,curDisp)}</div><div class="s">${prevTotal?`${t('rMonth')==='本月'?'Last':'上月'} ${fmtMoney(prevTotal,curDisp)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}${unpricedSub}</div></div>`+
+    `<div class="card"><div class="k">${t('statCodex')}</div><div class="v">${fmtMoney((s.per_agent.codex||{}).usd||0,'usd')}</div><div class="s">≈ ¥${((s.per_agent.codex||{}).cny_total||0).toFixed(2)} · ${t('rate')} ${s.usd_cny}</div></div>`+
+    `<div class="card"><div class="k">${t('statZcode')}</div><div class="v">${fmtMoney((s.per_agent.zcode||{}).cny||0)}</div><div class="s">${LANG==='en'?'≈ $'+((s.per_agent.zcode||{}).usd_total||0).toFixed(2):'GLM 国内牌价折算'}</div></div>`+
+    `<div class="card"><div class="k">${t('statTokens')}</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">${t('tokenIn')} ${fmtTok(s.totals.tokens_in)} · ${t('tokenOut')} ${fmtTok(s.totals.tokens_out)}</div></div>`+
+    `<div class="card"><div class="k">${t('statTurns')}</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">${t('thErr')} ${fmt(s.totals.errors)}</div></div>`;
   // 每日费用堆叠柱
   const daily=(s.daily||[]).slice(-statRange||undefined);
   const dates=[...new Set(daily.map(d=>d.date))].sort();
   const mk=(label,data,color,type,extra={})=>type==='bar'
     ?{label,data,backgroundColor:color,stack:'s',...extra}
     :{label,data,borderColor:color,backgroundColor:color+'22',fill:true,tension:.3,pointRadius:0,...extra};
+  const costOf=r=>LANG==='en'?(r.cost_usd||0):(r.cost_cny||0);
   const per=(a,f)=>dates.map(dt=>{const r=daily.find(x=>x.date===dt&&x.agent===a);return r?+(f(r).toFixed(2)):0;});
   charts.dc?.destroy();
   charts.dc=new Chart($('#cDailyCost'),{type:'bar',data:{labels:dates.map(d=>d.slice(5)),datasets:[
-    mk('Codex',per('codex',r=>r.cost_cny),'#5b8def','bar'),
-    mk('ZCode',per('zcode',r=>r.cost_cny),'#e0b64f','bar')]},
+    mk('Codex',per('codex',r=>costOf(r)),'#5b8def','bar'),
+    mk('ZCode',per('zcode',r=>costOf(r)),'#e0b64f','bar')]},
     options:{plugins:{legend:{labels:{boxWidth:12}}},scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:15,color:C.grid}},y:{stacked:true,beginAtZero:true,grid:{color:C.grid}}}}});
   // 每日 token 折线
   charts.dt?.destroy();
@@ -963,18 +1089,18 @@ function renderStats(){
     datasets:[{data:share.map(x=>+x[1].toFixed(2)),backgroundColor:['#5b8def','#e0b64f']}]},
     options:{plugins:{legend:{labels:{boxWidth:12}}}}});
   // 本月概览表
-  $('#tMonth').innerHTML='<tr><th>项目</th><th>本月</th></tr>'+
-    `<tr><td>Codex 费用</td><td>${fmtMoney((agents.codex||{}).usd||0,'usd')}</td></tr>`+
-    `<tr><td>ZCode 费用</td><td>${fmtMoney((agents.zcode||{}).cny||0)}</td></tr>`+
-    `<tr><td>合计（¥）</td><td><b>${fmtMoney(month.total_cny||0)}</b></td></tr>`+
-    `<tr><td>轮次 / 错误</td><td>${fmt(s.totals.turns)} / ${fmt(s.totals.errors)}</td></tr>`+
-    `<tr><td>采样时间</td><td>${String(s.generated_at||'').slice(5,16).replace('T',' ')}</td></tr>`;
+  $('#tMonth').innerHTML='<tr><th>'+t('thItem')+'</th><th>'+t('thMonth')+'</th></tr>'+
+    `<tr><td>${t('monthTableRowCodex')}</td><td>${fmtMoney((agents.codex||{}).usd||0,'usd')}</td></tr>`+
+    `<tr><td>${t('monthTableRowZcode')}</td><td>${fmtMoney((agents.zcode||{}).cny||0,'cny')}</td></tr>`+
+    `<tr><td>${t('monthTableRowTotal')}</td><td><b>${fmtMoney(LANG==='en'?(month.usd_total||0):(month.cny_total||0),curDisp)}</b></td></tr>`+
+    `<tr><td>${t('monthTableRowTurns')}</td><td>${fmt(s.totals.turns)} / ${fmt(s.totals.errors)}</td></tr>`+
+    `<tr><td>${t('monthTableRowSampled')}</td><td>${String(s.generated_at||'').slice(5,16).replace('T',' ')}</td></tr>`;
   // 模型费用明细
   const rows=(month.models||[]);
-  $('#tStatModels').innerHTML='<tr><th>模型</th><th>来源</th><th>轮次</th><th>输入 tok</th><th>输出 tok</th><th>费用</th></tr>'+
+  $('#tStatModels').innerHTML='<tr><th>'+t('thModel')+'</th><th>'+t('thSource')+'</th><th>'+t('thTurns')+'</th><th>'+t('thIn')+'</th><th>'+t('thOut')+'</th><th>'+t('thCost')+'</th></tr>'+
     (rows.length?rows.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${m.agent==='zcode'?'ZCode':'Codex'}</td><td>${fmt(m.turns)}</td>
       <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td>
-      <td><b>${fmtMoney(m.cost,m.currency)}</b></td></tr>`).join(''):'<tr><td style="color:var(--dim)">本月暂无数据</td></tr>');
+      <td><b>${fmtNative(m)}</b></td></tr>`).join(''):`<tr><td colspan="6" style="color:var(--dim)">${t('noData')}</td></tr>`);
 }
 
 let sprintData={sprints:[],tasks:{},projects:[]};
@@ -1045,13 +1171,13 @@ function updateSprintProjects(){
   }
 }
 function sprintStateText(s){
-  if(s.status==='stopped')return '已手动停止';
-  if(s.status==='done')return '已结束';
+  if(s.status==='stopped')return t('spStopped');
+  if(s.status==='done')return t('spEnded');
   const[a,b]=s.window||[0,0];
   const now=Date.now()/1000;
-  if(now<a)return '等待窗口开启';
-  if(now>=b)return '收尾中';
-  return '进行中';
+  if(now<a)return t('spWait');
+  if(now>=b)return t('spClosing');
+  return t('stRunning');
 }
 function loadSprint(){
   fetch('/api/sprint').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
@@ -1064,8 +1190,8 @@ function renderSprints(){
   $('#spTabCount').hidden=active.length===0;
   $('#spTabCount').textContent=String(active.length);
   const running=active.filter(s=>s.status==='running').length;
-  $('#spSummary').innerHTML=`<span><strong>${running}</strong>进行中</span><span><strong>${active.length-running}</strong>等待</span>`+
-    (active.length?`<button type="button" class="primary-action" onclick="stopAllSprints()" style="background:var(--fail);border-color:var(--fail)">中止全部</button>`:'');
+  $('#spSummary').innerHTML=`<span><strong>${running}</strong>${t('runningN')}</span><span><strong>${active.length-running}</strong>${t('waitingN')}</span>`+
+    (active.length?`<button type="button" class="primary-action" onclick="stopAllSprints()" style="background:var(--fail);border-color:var(--fail)">${t('stopAll')}</button>`:'');
   $('#spList').innerHTML=list.slice(0,10).map(s=>{
     const tasks=sprintData.tasks[s.id]||[];
     const cnt={done:0,failed:0,running:0,pending:0,stopped:0,skipped:0};
@@ -1085,19 +1211,19 @@ function renderSprints(){
         <span class="idx">${i+1}</span><span class="sp-qprompt" title="${esc(t.prompt)}">${esc((t.prompt||'').slice(0,60))}</span>
         <span class="ops"><button type="button" title="删除该任务" onclick="deleteSprintTask('${esc(s.id)}','${esc(t.id)}')">✕</button></span>
       </div>`).join('')
-      :'<div class="hint" style="margin:4px 0">队列已空</div>';
+      :`<div class="hint" style="margin:4px 0">${t('queueEmpty')}</div>`;
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(state)}</span>
-      <b>${esc(s.name)}</b><span class="hint">${s.concurrency>1?`并行 ${s.concurrency}`:'串行'} · ${finished} / ${tasks.length} 完成</span>
+      <b>${esc(s.name)}</b><span class="hint">${s.concurrency>1?t('parallel')+' '+s.concurrency:t('serial')} · ${finished} / ${tasks.length} ${t('finishedN')}</span>
       ${s.status==='waiting'?`<span class="hint">并行</span><input type="number" min="1" max="6" value="${s.concurrency}" id="spcc-${esc(s.id)}" style="width:52px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);border-radius:6px;padding:2px 6px;font-size:11px">
-        <button type="button" class="primary-action" style="padding:3px 12px;font-size:11px" onclick="startSprint('${esc(s.id)}')">开始</button>
-        <button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">删除</button>`:''}
-      ${isActive?`<button type="button" onclick="stopSprint('${esc(s.id)}')">中止</button>`:''}
-      ${!isActive?`<button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">删除</button>`:''}</div>
+        <button type="button" class="primary-action" style="padding:3px 12px;font-size:11px" onclick="startSprint('${esc(s.id)}')">${t('start')}</button>
+        <button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}
+      ${isActive?`<button type="button" onclick="stopSprint('${esc(s.id)}')">${t('stop')}</button>`:''}
+      ${!isActive?`<button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}</div>
       <div class="meta">${esc(winText)} · ${esc(s.cwd)}${s.manual?' · 手动启动':''}</div>
       ${s.status==='running'?`<div class="qbar" style="margin-top:8px"><span class="track" style="flex:1"><span class="fill" style="width:${pct}%;background:var(--accent)"></span></span><span class="pct">${pct}%</span></div>`:''}
       ${runningNow.length?`<div class="meta" style="color:var(--warn)">▸ 正在跑 ${runningNow.length} 个：${esc(runningNow.map(t=>(t.prompt||'').slice(0,30)).join(' ｜ '))}</div>`:''}
-      ${pending.length&&isActive?`<div style="margin-top:8px"><div class="hint" style="margin-bottom:3px">待跑队列（可拖动排序）</div><div id="spq-${esc(s.id)}">${pendingRows}</div></div>`:''}
-      ${cnt.skipped||cnt.stopped?`<div class="meta">跳过 ${cnt.skipped} · 停止 ${cnt.stopped} · 失败 ${cnt.failed} · 完成 ${cnt.done}</div>`:''}
+      ${pending.length&&isActive?`<div style="margin-top:8px"><div class="hint" style="margin-bottom:3px">${t('pendingQueue')}</div><div id="spq-${esc(s.id)}">${pendingRows}</div></div>`:''}
+      ${cnt.skipped||cnt.stopped?`<div class="meta">${t('skippedN')} ${cnt.skipped} · ${t('stoppedN')} ${cnt.stopped} · ${t('stFailed')} ${cnt.failed} · ${t('finishedN')} ${cnt.done}</div>`:''}
       ${s.error?`<div class="meta" style="color:var(--fail)">${esc(s.error)}</div>`:''}
       </article>`;
   }).join('')||'<div class="empty-state">还没有窗口。创建后会在窗口时间内自动跑队列。</div>';
@@ -1211,7 +1337,7 @@ else if(location.hash==='#sprint'){curAgent='zcode';applyAgentFrame();setTab('sp
 else if(location.hash==='#stats'){curAgent='all';applyAgentFrame();setTab('stats',false);}
 else applyAgentFrame();
 addSprintTask();
-scheduleFields();loadSchedule();loadSprint();load();
+applyI18n();scheduleFields();loadSchedule();loadSprint();load();
 setInterval(load,30000);setInterval(loadSchedule,5000);setInterval(loadSprint,5000);
 </script>
 </body>

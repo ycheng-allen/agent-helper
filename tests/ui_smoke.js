@@ -33,7 +33,8 @@ element('#sTrigger').value = 'at';
 const context = {
   console, Date, Map, String, Number, JSON, Math, Promise, Intl,
   document: { querySelector: element, querySelectorAll: () => [],
-              createElement: tag => element('<' + tag + '>') },
+              createElement: tag => element('<' + tag + '>'),
+              getElementById: id => element('#' + id) },
   window: { addEventListener() {} },
   location: { hash: '' }, history: { replaceState() {} },
   fetch: async () => { throw Error('offline smoke test'); },
