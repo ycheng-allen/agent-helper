@@ -6,8 +6,9 @@ const html = fs.readFileSync(require('path').join(__dirname, '..', 'web', 'index
 const markup = html.split('<script>')[0];
 const ids = [...markup.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 assert.strictEqual(ids.length, new Set(ids).size, 'HTML IDs must be unique');
-for (const id of ['tab-overview', 'tab-schedule', 'tab-sprint', 'view-overview', 'view-schedule',
-                  'view-sprint', 'sList', 'agentCodex', 'agentZcode', 'quotaPanel', 'probePanel',
+for (const id of ['tab-stats', 'tab-overview', 'tab-schedule', 'tab-sprint', 'view-stats',
+                  'view-overview', 'view-schedule', 'view-sprint', 'sList', 'spaceAll',
+                  'agentCodex', 'agentZcode', 'quotaPanel', 'probePanel', 'zprobePanel',
                   'sAutoPanel', 'zSchedNote', 'optQuota']) {
   assert(ids.includes(id), `Missing ${id}`);
 }
@@ -45,6 +46,16 @@ assert(element('#quota').innerHTML.includes('46%'));
 assert(element('#quota').innerHTML.includes('41%'));
 assert(element('#quota').innerHTML.includes('已用 54%'));
 assert(element('#quota').innerHTML.includes('Codex 账户实时数据'));
+// 总览空间：只显示统计标签页
+vm.runInContext("switchAgent('all')", context);
+assert.strictEqual(element('#tab-stats').hidden, false);
+assert.strictEqual(element('#tab-overview').hidden, true);
+assert.strictEqual(element('#tab-schedule').hidden, true);
+assert.strictEqual(element('#view-stats').hidden, false);
+assert.strictEqual(element('#spaceAll')['aria-selected'], 'true');
+vm.runInContext("switchAgent('codex')", context);
+assert.strictEqual(element('#tab-stats').hidden, true);
+assert.strictEqual(element('#view-stats').hidden, true);
 vm.runInContext("setTab('schedule')", context);
 assert.strictEqual(element('#view-overview').hidden, true);
 assert.strictEqual(element('#view-schedule').hidden, false);

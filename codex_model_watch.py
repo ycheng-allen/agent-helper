@@ -30,14 +30,17 @@ import argparse
 import glob
 import json
 import os
+import re
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
 import webbrowser
 from watch_scheduler import (Scheduler, all_task_snapshots, available_projects, ensure_zcode_provider_config,
-                             init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, read_zcode_quota,
-                             rule_rows, sprint_window, task_snapshots, validate_rule, validate_sprint)
+                             helper_data_dir, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota,
+                             read_zcode_quota, rule_rows, sprint_window, task_snapshots, validate_rule,
+                             validate_sprint, zcode_bin, zcode_cmd)
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -76,10 +79,13 @@ def db_connect(db_path):
         ts TEXT PRIMARY KEY, primary_used REAL, secondary_used REAL, raw TEXT);
     CREATE TABLE IF NOT EXISTS probes(
         ts TEXT PRIMARY KEY, requested TEXT, served TEXT, swapped INTEGER,
-        latency_ms INTEGER, safety_header TEXT, error TEXT);
+        latency_ms INTEGER, safety_header TEXT, error TEXT, agent TEXT DEFAULT 'codex');
     CREATE TABLE IF NOT EXISTS threads(
         thread_id TEXT PRIMARY KEY, requested TEXT);
     """)
+    # 旧库迁移：probes 补 agent 列
+    if "agent" not in {r[1] for r in conn.execute("PRAGMA table_info(probes)")}:
+        conn.execute("ALTER TABLE probes ADD COLUMN agent TEXT DEFAULT 'codex'")
     # 旧库迁移：turns 补 agent 列（存量行视为 codex），索引随列就位后建
     if "agent" not in {r[1] for r in conn.execute("PRAGMA table_info(turns)")}:
         conn.execute("ALTER TABLE turns ADD COLUMN agent TEXT DEFAULT 'codex'")
@@ -498,14 +504,14 @@ def month_cutoff():
     return start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def compute_cost(conn, agent, cutoff):
-    """Aggregate month-to-date token cost for one agent (or both when agent='')."""
+def compute_cost(conn, agent, cutoff, until=""):
+    """Aggregate token cost for one agent (or both when agent=''); range [cutoff, until)."""
     _, usd_cny = load_pricing()
-    cond = {"c": cutoff, "a": agent}
+    cond = {"c": cutoff, "u": until, "a": agent}
     rows = conn.execute("""SELECT COALESCE(NULLIF(served,''),'(未知)') model, agent,
                                   COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(cached_tokens),0) tcached,
                                   COALESCE(SUM(out_tokens),0) tout, COUNT(*) turns
-                           FROM turns WHERE (:c='' OR ts>=:c) AND (:a='' OR agent=:a)
+                           FROM turns WHERE (:c='' OR ts>=:c) AND (:u='' OR ts<:u) AND (:a='' OR agent=:a)
                            GROUP BY model, agent ORDER BY tin DESC""", cond).fetchall()
     result = {"usd": 0.0, "cny": 0.0, "unpriced_tokens": 0, "models": []}
     for r in rows:
@@ -523,6 +529,137 @@ def compute_cost(conn, agent, cutoff):
     result["total_cny"] = round(result["usd"] * usd_cny + result["cny"], 2)
     result["models"].sort(key=lambda m: -m["cost"])
     return result
+
+
+def prev_month_cutoff():
+    """UTC string for the start of the previous local month."""
+    now_local = datetime.now().astimezone()
+    first = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    prev_last = first - timedelta(days=1)
+    prev_first = prev_last.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return prev_first.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def api_overview(conn):
+    """Aggregate cross-agent statistics for the 全局总览 dashboard."""
+    _, usd_cny = load_pricing()
+    mc, pc = month_cutoff(), prev_month_cutoff()
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    month = compute_cost(conn, "", mc)
+    prev = compute_cost(conn, "", pc, mc)
+    per_agent = {a: compute_cost(conn, a, mc) for a in ("codex", "zcode")}
+
+    totals = conn.execute("""SELECT COUNT(*) turns,
+                                    COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(out_tokens),0) tout,
+                                    COALESCE(SUM(cached_tokens),0) tcached,
+                                    SUM(CASE WHEN error_kind IS NOT NULL THEN 1 ELSE 0 END) errors
+                             FROM turns WHERE ts>=? AND ts<?""", (mc, "9")).fetchone()
+
+    daily = []
+    for r in conn.execute("""SELECT substr(ts,1,10) d, agent,
+                                    COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(out_tokens),0) tout,
+                                    COUNT(*) turns FROM turns
+                             WHERE ts>=? AND ts IS NOT NULL GROUP BY d, agent ORDER BY d""", (d30,)):
+        daily.append({"date": r["d"], "agent": r["agent"], "tin": r["tin"],
+                      "tout": r["tout"], "turns": r["turns"]})
+    # 逐日费用需要按模型拆分，用单条聚合查询
+    priced = {}
+    for r in conn.execute("""SELECT substr(ts,1,10) d, agent, served,
+                                    COALESCE(SUM(in_tokens),0) tin, COALESCE(SUM(cached_tokens),0) tcached,
+                                    COALESCE(SUM(out_tokens),0) tout
+                             FROM turns WHERE ts>=? AND ts IS NOT NULL
+                             GROUP BY d, agent, served""", (d30,)):
+        c = price_tokens(r["served"], r["tin"], r["tcached"], r["tout"], usd_cny)
+        key = (r["d"], r["agent"])
+        if c:
+            priced[key] = priced.get(key, 0.0) + c["cny"]
+    for item in daily:
+        item["cost_cny"] = round(priced.get((item["date"], item["agent"]), 0.0), 2)
+
+    return {"generated_at": iso_now(), "usd_cny": usd_cny,
+            "month": month, "prev_month": {"usd": prev["usd"], "cny": prev["cny"],
+                                           "total_cny": prev["total_cny"]},
+            "per_agent": per_agent,
+            "totals": {"turns": totals["turns"], "tokens_in": totals["tin"],
+                       "tokens_out": totals["tout"], "tokens_cached": totals["tcached"],
+                       "errors": totals["errors"] or 0,
+                       "cache_hit": round(totals["tcached"] * 100.0 / totals["tin"], 1) if totals["tin"] else 0.0},
+            "daily": daily}
+
+
+def run_zcode_probe(model, timeout=180):
+    """Ask for a specific ZCode model headlessly and read what actually served.
+
+    Writes a probe personal config whose defaultModelSelection is the requested
+    model, runs one tiny turn, then reads the served model_id from ZCode's own
+    model_usage table via the returned session id.
+    """
+    import tempfile
+    base = zcode_cmd()
+    if base is None:
+        return {"error": "未找到 ZCode CLI"}
+    try:
+        config = ensure_zcode_provider_config()
+    except Exception as exc:
+        return {"error": str(exc)}
+    probe_cfg = os.path.join(helper_data_dir(), "zcode-probe-config.json")
+    try:
+        cfg = json.load(open(config, encoding="utf-8"))
+        rule = cfg["config"]["providerConfigRules"]["providerRules"][0]
+        models = list(dict.fromkeys([*(rule["config"].get("personalModelIds") or []), model]))
+        rule["config"]["personalModelIds"] = models
+        cfg["config"]["defaultModelSelection"] = {"providerId": rule["providerId"], "modelId": model}
+        with open(probe_cfg, "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, ensure_ascii=False, indent=1)
+        os.chmod(probe_cfg, 0o600)
+    except Exception as exc:
+        return {"error": "生成探针配置失败: " + str(exc)[:150]}
+    cli = zcode_bin()
+    builtin = os.path.normpath(os.path.join(os.path.dirname(cli), "..", "config", "provider",
+                                            "zcode-builtin.json")) if cli else ""
+    env = {**os.environ, "ZCODE_PERSONAL_PROVIDER_CONFIG_FILE": probe_cfg}
+    if builtin and os.path.isfile(builtin):
+        env["ZCODE_BUILTIN_PROVIDER_CONFIG_FILE"] = builtin
+    workdir = tempfile.mkdtemp(prefix="zcode-probe-")
+    cmd = [*base, "--prompt", "Reply with exactly: ok", "--cwd", workdir, "--json"]
+    t0 = time.time()
+    error, session = "", ""
+    try:
+        proc = subprocess.run(cmd, env=env, text=True, cwd=workdir, timeout=timeout,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        match = re.search(r"sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                          proc.stdout or "")
+        session = match.group(0) if match else ""
+        if proc.returncode != 0:
+            error = (proc.stderr or proc.stdout or "")[-300:] or "exit %d" % proc.returncode
+    except subprocess.TimeoutExpired:
+        error = "探针超时"
+    except Exception as exc:
+        error = str(exc)[:200]
+    latency = int((time.time() - t0) * 1000)
+    served = ""
+    if session:
+        try:
+            zdb = sqlite3.connect("file:" + os.path.join(HOME, ".zcode", "cli", "db", "db.sqlite") +
+                                  "?mode=ro", uri=True, timeout=2)
+            row = zdb.execute("SELECT model_id FROM model_usage WHERE session_id=? "
+                              "ORDER BY started_at LIMIT 1", (session,)).fetchone()
+            served = row[0] if row else ""
+            zdb.close()
+        except sqlite3.Error:
+            pass
+    if not served and not error:
+        error = "未能从 ZCode 读取实际派出模型"
+    swapped = 1 if (served and model and served != model) else 0
+    row = (iso_now(), model, served, swapped, latency, "zcode", error or None, "zcode")
+    with g_lock:
+        c = db_connect(db_path())
+        c.execute("INSERT OR REPLACE INTO probes(ts, requested, served, swapped, latency_ms, "
+                  "safety_header, error, agent) VALUES(?,?,?,?,?,?,?,?)", row)
+        c.commit()
+    return {"ts": row[0], "requested": model, "served": served, "swapped": bool(swapped),
+            "latency_ms": latency, "error": error}
 
 
 # ---------------------------------------------------------------- 聚合输出
@@ -570,9 +707,10 @@ def api_data(conn, days=0, agent=""):
                          " ORDER BY ts DESC LIMIT 50", cond)
     quota_latest = q("SELECT * FROM quota ORDER BY ts DESC LIMIT 1")
     quota_hist = q("SELECT ts, primary_used, secondary_used FROM quota ORDER BY ts DESC LIMIT 48")
-    probes = q("SELECT * FROM probes ORDER BY ts DESC LIMIT 100")
+    probes = q("SELECT * FROM probes WHERE (:a='' OR agent=:a) ORDER BY ts DESC LIMIT 100", {"a": agent})
     probe_summary = conn.execute("""SELECT COUNT(*) n, COALESCE(SUM(swapped),0) swapped
-                                    FROM probes""").fetchone()
+                                    FROM probes WHERE (:a='' OR agent=:a)""",
+                                  {"a": agent}).fetchone()
     total_models = sum(m["turns"] for m in models) or 1
     _, usd_cny = load_pricing()
     for m in models:
@@ -668,7 +806,8 @@ def seed_demo(conn):
                         VALUES('demo', ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(file, turn_id) DO NOTHING""",
                      [(t[0],) + t[1:] for t in turns])
     conn.executemany("INSERT INTO quota VALUES(?,?,?,?) ON CONFLICT(ts) DO NOTHING", quota)
-    conn.executemany("INSERT INTO probes VALUES(?,?,?,?,?,?,?) ON CONFLICT(ts) DO NOTHING", probes)
+    conn.executemany("INSERT INTO probes(ts, requested, served, swapped, latency_ms, safety_header, error) "
+                     "VALUES(?,?,?,?,?,?,?) ON CONFLICT(ts) DO NOTHING", probes)
     conn.commit()
 
 
@@ -768,6 +907,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"sprints": sprints, "tasks": tasks,
                             "projects": available_projects(conn(), g_args.codex_home, g_args.zcode_home),
                             "demo": g_state["demo"]})
+            return
+        if path == "/api/overview":
+            with g_lock:
+                self._json(api_overview(conn()))
             return
         self.send_response(404)
         self.end_headers()
@@ -911,7 +1054,10 @@ class Handler(BaseHTTPRequestHandler):
             if not model:
                 self._json({"error": "缺少 model"}, 400)
                 return
-            result = run_probe(g_args.codex_home, model)
+            if (body.get("agent") or "codex") == "zcode":
+                result = run_zcode_probe(model)
+            else:
+                result = run_probe(g_args.codex_home, model)
             self._json(result)
             return
         self.send_response(404)

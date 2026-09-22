@@ -185,7 +185,8 @@
 <div class="wrap">
   <div class="topbar">
     <div class="logo"><b>AGENT HELPER</b><span>额度监控与任务排程</span></div>
-    <div class="switcher" role="tablist" aria-label="选择助手">
+    <div class="switcher" role="tablist" aria-label="选择空间">
+      <button class="switch-btn c-all" id="spaceAll" role="tab" aria-selected="false" onclick="switchAgent('all')">总览</button>
       <button class="switch-btn c-codex" id="agentCodex" role="tab" aria-selected="true" onclick="switchAgent('codex')">Codex<span class="switch-count" id="codexCount" hidden></span></button>
       <button class="switch-btn c-zcode" id="agentZcode" role="tab" aria-selected="false" onclick="switchAgent('zcode')">ZCode<span class="switch-count" id="zcodeCount" hidden></span></button>
     </div>
@@ -196,10 +197,31 @@
   </div>
   <div id="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
   <nav class="tabs" role="tablist" aria-label="主导航" onkeydown="handleTabKey(event)">
+    <button class="tab" id="tab-stats" role="tab" aria-controls="view-stats" aria-selected="false" onclick="setTab('stats')">统计总览</button>
     <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')">监控总览</button>
     <button class="tab" id="tab-schedule" role="tab" aria-controls="view-schedule" aria-selected="false" onclick="setTab('schedule')">任务排程 <span class="tab-count" id="sTabCount" hidden></span></button>
     <button class="tab" id="tab-sprint" role="tab" aria-controls="view-sprint" aria-selected="false" onclick="setTab('sprint')">玩命蹬 <span class="tab-count" id="spTabCount" hidden></span></button>
   </nav>
+
+  <section id="view-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+  <div class="pagehead"><h1>全局统计总览</h1>
+    <div class="chips" id="statBtns"></div></div>
+
+  <div class="cards" id="statCards"></div>
+
+  <div class="panel"><h2>每日费用趋势（¥，按 agent 堆叠）</h2><canvas id="cDailyCost"></canvas></div>
+
+  <div class="panel"><h2>每日 Token 用量（输入+输出，按 agent）</h2><canvas id="cDailyTok"></canvas></div>
+
+  <div class="grid2">
+    <div class="panel"><h2>本月费用构成</h2><canvas id="cAgentShare"></canvas></div>
+    <div class="panel"><h2>本月概览</h2><table id="tMonth"></table></div>
+  </div>
+
+  <div class="panel"><h2>本月模型费用明细</h2><div style="overflow-x:auto"><table id="tStatModels"></table></div></div>
+
+  <div class="foot">费用为公开 API 牌价折算（汇率可在 ~/.codex-model-watch/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
+  </section>
 
   <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
 
@@ -236,6 +258,22 @@
     <div class="legend"><span><i class="sq ok"></i>一致</span><span><i class="sq swap"></i>被偷换</span><span><i class="sq err"></i>失败/无结果</span><span style="margin-left:auto">最近 60 次探测</span></div>
     <div class="squares" id="pSquares"></div>
     <div style="overflow-x:auto"><table id="tProbe"></table></div>
+  </div>
+
+  <div class="panel" id="zprobePanel"><h2>模型探针（ZCode）
+      <span id="zpNote" style="margin-left:8px;color:var(--dim);font-size:11px;font-weight:400"></span>
+    </h2>
+    <div class="toolbar">
+      <span class="hint">请求模型</span>
+      <select class="pmodel" id="zpModel" style="width:auto">
+        <option value="GLM-5.3">GLM-5.3</option>
+        <option value="GLM-5.3-Flash">GLM-5.3-Flash</option>
+      </select>
+      <button class="pgo" id="zpGo" onclick="runZProbe()">立即探测</button>
+      <span class="hint">用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度</span>
+    </div>
+    <div id="zpOut" style="margin:8px 0;font-size:12.5px;min-height:20px"></div>
+    <div style="overflow-x:auto"><table id="tZProbe"></table></div>
   </div>
 
   <div class="foot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
@@ -499,6 +537,17 @@ function render(d){
     const cls=p.swapped?'swap':(p.served?'ok':'err');
     const info=`${String(p.ts).slice(5,16).replace('T',' ')} · 请求 ${p.requested} → 实际 ${p.served||p.error||'?'}`;
     return `<span class="sq ${cls}" title="${info}"></span>`;}).join('')||'<span class="hint">还没有探测记录</span>';
+  if(curAgent==='zcode'){
+    $('#zpNote').textContent=`共 ${fmt(ps.total||0)} 次探测 · 偷换 ${fmt(ps.swapped||0)} 次`;
+    $('#tZProbe').innerHTML='<tr><th>时间</th><th>请求模型</th><th>实际派出</th><th>结果</th><th>耗时</th></tr>'+
+      (probes.length?probes.slice(0,10).map(p=>{
+        const sw=p.swapped;
+        return `<tr><td>${String(p.ts).slice(5,16).replace('T',' ')}</td><td>${modelBadge(p.requested)}</td>
+          <td style="color:${sw?'var(--fail)':'var(--ok)'}">${p.served||(p.error?'<span style="color:var(--dim)">'+(p.error||'').slice(0,40)+'</span>':'?')}</td>
+          <td>${sw?'<span class="badge b-bad">被偷换</span>':(p.served?'<span class="badge b-ok">一致</span>':'<span class="badge b-off">失败</span>')}</td>
+          <td>${p.latency_ms?fmtDur(p.latency_ms):'—'}</td></tr>`;}).join('')
+        :'<tr><td style="color:var(--dim)">还没有探测记录</td></tr>');
+  }
   $('#tProbe').innerHTML='<tr><th>时间</th><th>请求模型</th><th>实际派出</th><th>结果</th><th>耗时</th></tr>'+
     (probes.length?probes.slice(0,15).map(p=>{
       const sw=p.swapped;
@@ -527,18 +576,25 @@ async function load(){
 }
 
 let curAgent='codex';
-try{const saved=localStorage.getItem('cmw-agent');if(saved==='codex'||saved==='zcode')curAgent=saved;}catch(e){}
+try{const saved=localStorage.getItem('cmw-space');if(['all','codex','zcode'].includes(saved))curAgent=saved;}catch(e){}
 let curTab='overview';
+const isAll=()=>curAgent==='all';
 function applyAgentFrame(){
   const z=curAgent==='zcode';
-  $('#agentCodex').classList.toggle('on',!z);
-  $('#agentCodex').setAttribute('aria-selected',String(!z));
+  $('#spaceAll').classList.toggle('on',isAll());
+  $('#spaceAll').setAttribute('aria-selected',String(isAll()));
+  $('#agentCodex').classList.toggle('on',curAgent==='codex');
+  $('#agentCodex').setAttribute('aria-selected',String(curAgent==='codex'));
   $('#agentZcode').classList.toggle('on',z);
   $('#agentZcode').setAttribute('aria-selected',String(z));
+  $('#tab-stats').hidden=!isAll();
+  $('#tab-overview').hidden=isAll();
+  $('#tab-schedule').hidden=isAll();
   $('#tab-sprint').hidden=!z;
   $('#ovTitle').textContent=z?'ZCode 监控总览':'Codex 监控总览';
   $('#quotaTitle').textContent=z?'ZCode 额度水位':'Codex 额度水位';
   $('#probePanel').hidden=z;
+  $('#zprobePanel').hidden=!z;
   $('#schedSub').textContent=z
     ?'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。'
     :'让 Codex 在约定的时间或任务完成后继续工作。';
@@ -551,44 +607,50 @@ function applyAgentFrame(){
 function switchAgent(a){
   if(a===curAgent){setTab(curTab);return;}
   curAgent=a;
-  try{localStorage.setItem('cmw-agent',a);}catch(e){}
-  if(a==='codex'&&curTab==='sprint')curTab='overview';
+  try{localStorage.setItem('cmw-space',a);}catch(e){}
+  curTab=isAll()?'stats':'overview';
   applyAgentFrame();
-  load();
-  setTab(curTab);
+  if(isAll()){setTab('stats');}
+  else{load();setTab(curTab);}
+}
+function spaceTabs(){
+  return isAll()?['stats']:['overview','schedule'].concat(curAgent==='zcode'?['sprint']:[]);
 }
 function setTab(name,updateHash=true){
-  if(name==='sprint'&&curAgent!=='zcode')name='overview';
+  if(!spaceTabs().includes(name))name=isAll()?'stats':'overview';
   curTab=name;
-  ['overview','schedule','sprint'].forEach(n=>{
+  ['stats','overview','schedule','sprint'].forEach(n=>{
     $('#view-'+n).hidden=n!==name;
     $('#tab-'+n).setAttribute('aria-selected',String(n===name));
   });
-  const hash='#'+curAgent+(name==='overview'?'':'/'+name);
+  const hash='#'+curAgent+((name==='stats'||name==='overview')?'':'/'+name);
   if(updateHash&&location.hash!==hash)history.replaceState(null,'',hash);
   if(name==='overview'&&dLast)render(dLast);
   if(name==='schedule')loadSchedule();
   if(name==='sprint')loadSprint();
+  if(name==='stats')loadStats();
 }
 function handleTabKey(event){
   if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
   event.preventDefault();
-  const visible=['overview','schedule'].concat(curAgent==='zcode'?['sprint']:[]);
+  const visible=spaceTabs();
   const current=visible.indexOf(curTab);
   const target=event.key==='ArrowRight'||event.key==='End'?visible[event.key==='End'?visible.length-1:(current+1)%visible.length]:
     event.key==='ArrowLeft'||event.key==='Home'?visible[event.key==='Home'?0:(current+visible.length-1)%visible.length]:curTab;
   setTab(target);$('#tab-'+target).focus();
 }
 function refreshCurrentTab(){
-  if(curTab==='sprint')loadSprint();
+  if(curTab==='stats')loadStats();
+  else if(curTab==='sprint')loadSprint();
   else if(curTab==='schedule')loadSchedule();
   else load();
 }
 function applyHash(h){
   const parts=h.replace(/^#\/?/,'').split('/');
   let a=parts[0],t=parts[1]||'overview';
-  if(a!=='codex'&&a!=='zcode')a=curAgent;
-  if(!['overview','schedule','sprint'].includes(t))t='overview';
+  if(!['all','codex','zcode'].includes(a))a=curAgent;
+  if(!['stats','overview','schedule','sprint'].includes(t))t='overview';
+  if(t==='stats'&&a!=='all')t='overview';
   if(t==='sprint'&&a!=='zcode')t='overview';
   const changed=a!==curAgent;
   curAgent=a;
@@ -607,6 +669,22 @@ function setWin(sec){
   el.innerHTML=WINS.map(([lab,sec])=>`<button type="button" class="chip ${sec===winSec?'on':''}" data-w="${sec}" onclick="setWin(${sec})">${lab}</button>`).join('');
 })();
 
+async function runZProbe(){
+  const sel=$('#zpModel');
+  const model=(sel.value||'').trim();
+  const out=$('#zpOut');
+  const btn=$('#zpGo');btn.disabled=true;btn.textContent='探测中…';
+  out.innerHTML='<span style="color:var(--dim)">正在用 ZCode 无头 CLI 发起最小请求…（约需 10-30 秒）</span>';
+  try{
+    const r=await(await fetch('/api/probe',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model,agent:'zcode'})})).json();
+    if(r.error){out.innerHTML='<span style="color:var(--fail)">探测失败：'+r.error+'</span>';}
+    else if(r.swapped){out.innerHTML=`<span style="color:var(--fail)">⚠ 被偷换：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
+    else{out.innerHTML=`<span style="color:var(--ok)">✓ 一致：请求 ${r.requested}，实际派出 ${r.served}（${r.latency_ms}ms）</span>`;}
+    load();
+  }catch(e){out.innerHTML='<span style="color:var(--fail)">请求失败：'+e+'</span>';}
+  btn.disabled=false;btn.textContent='立即探测';
+}
 async function runProbe(){
   const inp=$('#pModel');
   const model=(inp.value||'').trim();
@@ -807,6 +885,76 @@ async function setAutoResume(){
   finally{control.disabled=false;}
 }
 
+let statsData=null;
+let statRange=30;
+const STAT_RANGES=[['最近 30 天',30],['本月',0]];
+async function loadStats(){
+  try{statsData=await(await fetch('/api/overview')).json();}catch(e){return;}
+  renderStats();
+}
+function setStatRange(days){
+  statRange=days;
+  document.querySelectorAll('#statBtns .chip').forEach(x=>x.classList.toggle('on',String(x.dataset.days)===String(days)));
+  renderStats();
+}
+function renderStats(){
+  if(!statsData)return;
+  const el=$('#statBtns');
+  if(!el.dataset.built){
+    el.dataset.built='1';
+    el.innerHTML=STAT_RANGES.map(([l,d])=>`<button type="button" class="chip ${d===statRange?'on':''}" data-days="${d}" onclick="setStatRange(${d})">${l}</button>`).join('');
+  }
+  const s=statsData, month=s.month, prev=s.prev_month||{};
+  const inWindow=d=>d===0||true; // 月卡固定本月；趋势图窗口由图表自身控制
+  const mom=prev.total_cny?(month.total_cny-prev.total_cny)/prev.total_cny*100:null;
+  const agents=s.per_agent||{};
+  $('#statCards').innerHTML=
+    `<div class="card"><div class="k">本月费用（¥）</div><div class="v ${mom&&mom>50?'fail':''}">${fmtMoney(month.total_cny||0)}</div><div class="s">${prev.total_cny?`上月 ¥${(prev.total_cny).toFixed(2)} · `:''}${mom!=null?(mom>=0?'+':'')+mom.toFixed(0)+'%':'——'}</div></div>`+
+    `<div class="card"><div class="k">本月费用（$）</div><div class="v">${fmtMoney(month.usd||0,'usd')}</div><div class="s">Codex 官方牌价折算</div></div>`+
+    `<div class="card"><div class="k">本月 Tokens</div><div class="v">${fmtTok((s.totals.tokens_in||0)+(s.totals.tokens_out||0))}</div><div class="s">输入 ${fmtTok(s.totals.tokens_in)} · 输出 ${fmtTok(s.totals.tokens_out)}</div></div>`+
+    `<div class="card"><div class="k">缓存命中</div><div class="v ac">${s.totals.cache_hit||0}%</div><div class="s">命中 ${fmtTok(s.totals.tokens_cached)} tok</div></div>`+
+    `<div class="card"><div class="k">本月轮次</div><div class="v">${fmt(s.totals.turns)}</div><div class="s">错误 ${fmt(s.totals.errors)} 次</div></div>`+
+    `<div class="card"><div class="k">未计价 Tokens</div><div class="v ${month.unpriced_tokens?'swap':''}">${fmtTok(month.unpriced_tokens||0)}</div><div class="s">可在 pricing.json 补价</div></div>`;
+  // 每日费用堆叠柱
+  const daily=(s.daily||[]).slice(-statRange||undefined);
+  const dates=[...new Set(daily.map(d=>d.date))].sort();
+  const mk=(label,data,color,type,extra={})=>type==='bar'
+    ?{label,data,backgroundColor:color,stack:'s',...extra}
+    :{label,data,borderColor:color,backgroundColor:color+'22',fill:true,tension:.3,pointRadius:0,...extra};
+  const per=(a,f)=>dates.map(dt=>{const r=daily.find(x=>x.date===dt&&x.agent===a);return r?+(f(r).toFixed(2)):0;});
+  charts.dc?.destroy();
+  charts.dc=new Chart($('#cDailyCost'),{type:'bar',data:{labels:dates.map(d=>d.slice(5)),datasets:[
+    mk('Codex',per('codex',r=>r.cost_cny),'#5b8def','bar'),
+    mk('ZCode',per('zcode',r=>r.cost_cny),'#e0b64f','bar')]},
+    options:{plugins:{legend:{labels:{boxWidth:12}}},scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:15,color:C.grid}},y:{stacked:true,beginAtZero:true,grid:{color:C.grid}}}}});
+  // 每日 token 折线
+  charts.dt?.destroy();
+  charts.dt=new Chart($('#cDailyTok'),{type:'line',data:{labels:dates.map(d=>d.slice(5)),datasets:[
+    mk('Codex',per('codex',r=>(r.tin+r.tout)/1e6),'#5b8def','line'),
+    mk('ZCode',per('zcode',r=>(r.tin+r.tout)/1e6),'#e0b64f','line')]},
+    options:{plugins:{legend:{labels:{boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:15,color:C.grid}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{callback:v=>v+'M'}}}}});
+  // 费用构成环图
+  const share=[['codex',(agents.codex||{}).total_cny||0],['zcode',(agents.zcode||{}).total_cny||0]].filter(x=>x[1]>0);
+  charts.as?.destroy();
+  charts.as=new Chart($('#cAgentShare'),{type:'doughnut',data:{
+    labels:share.map(x=>x[0]==='codex'?'Codex':'ZCode'),
+    datasets:[{data:share.map(x=>+x[1].toFixed(2)),backgroundColor:['#5b8def','#e0b64f']}]},
+    options:{plugins:{legend:{labels:{boxWidth:12}}}}});
+  // 本月概览表
+  $('#tMonth').innerHTML='<tr><th>项目</th><th>本月</th></tr>'+
+    `<tr><td>Codex 费用</td><td>${fmtMoney((agents.codex||{}).usd||0,'usd')}</td></tr>`+
+    `<tr><td>ZCode 费用</td><td>${fmtMoney((agents.zcode||{}).cny||0)}</td></tr>`+
+    `<tr><td>合计（¥）</td><td><b>${fmtMoney(month.total_cny||0)}</b></td></tr>`+
+    `<tr><td>轮次 / 错误</td><td>${fmt(s.totals.turns)} / ${fmt(s.totals.errors)}</td></tr>`+
+    `<tr><td>采样时间</td><td>${String(s.generated_at||'').slice(5,16).replace('T',' ')}</td></tr>`;
+  // 模型费用明细
+  const rows=(month.models||[]);
+  $('#tStatModels').innerHTML='<tr><th>模型</th><th>来源</th><th>轮次</th><th>输入 tok</th><th>输出 tok</th><th>费用</th></tr>'+
+    (rows.length?rows.map(m=>`<tr><td>${modelBadge(m.model)}</td><td>${m.agent==='zcode'?'ZCode':'Codex'}</td><td>${fmt(m.turns)}</td>
+      <td>${fmtTok(m.tin)}</td><td>${fmtTok(m.tout)}</td>
+      <td><b>${fmtMoney(m.cost,m.currency)}</b></td></tr>`).join(''):'<tr><td style="color:var(--dim)">本月暂无数据</td></tr>');
+}
+
 let sprintData={sprints:[],tasks:{},projects:[]};
 let sprintKind='daily';
 let spProjectMode='existing';
@@ -969,9 +1117,10 @@ $('#sTime').value=new Date(initialTime.getTime()-initialTime.getTimezoneOffset()
 const spInit=new Date(Date.now()+1800000);
 $('#spStartAt').value=new Date(spInit.getTime()-spInit.getTimezoneOffset()*60000).toISOString().slice(0,16);
 $('#spEndAt').value=new Date((spInit.getTime()+7200000)-spInit.getTimezoneOffset()*60000).toISOString().slice(0,16);
-if(location.hash.startsWith('#codex')||location.hash.startsWith('#zcode'))applyHash(location.hash);
+if(/^#(all|codex|zcode)/.test(location.hash))applyHash(location.hash);
 else if(location.hash==='#schedule')setTab('schedule',false);
 else if(location.hash==='#sprint'){curAgent='zcode';applyAgentFrame();setTab('sprint',false);}
+else if(location.hash==='#stats'){curAgent='all';applyAgentFrame();setTab('stats',false);}
 else applyAgentFrame();
 addSprintTask();
 scheduleFields();loadSchedule();loadSprint();load();
