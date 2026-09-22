@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 TICK_SECONDS = 5
 QUOTA_SECONDS = 10
+OVERVIEW_QUOTA_SECONDS = 30
 QUOTA_ERRORS = ("usage limit", "rate limit", "limit reached", "quota", "try again after")
 STALE_TURN_SECONDS = 7 * 86400
 _snapshot_cache = {}
@@ -91,7 +92,7 @@ def read_quota(timeout=12):
                             text=True, bufsize=1)
     try:
         for message in (
-            {"id": 1, "method": "initialize", "params": {"clientInfo": {"name": "codex-helper", "version": "0.3.2"}}},
+            {"id": 1, "method": "initialize", "params": {"clientInfo": {"name": "codex-helper", "version": "0.3.3"}}},
             {"method": "initialized"},
             {"id": 2, "method": "account/rateLimits/read"},
         ):
@@ -120,6 +121,11 @@ def read_quota(timeout=12):
             proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             proc.kill()
+            proc.wait(timeout=2)
+        if proc.stdin:
+            proc.stdin.close()
+        if proc.stdout:
+            proc.stdout.close()
 
 
 def quota_ready(data):
@@ -147,6 +153,19 @@ def next_reset(data):
     if not candidates:
         return None
     return max(w["resetsAt"] for w in candidates) if exhausted else min(w["resetsAt"] for w in candidates)
+
+
+def quota_snapshot(data, sampled_at):
+    """Return only the current Codex limit windows needed by the dashboard."""
+    limits = data.get("rateLimitsByLimitId") or {}
+    bucket = limits.get("codex") or data.get("rateLimits") or {}
+    windows = {}
+    for name in ("primary", "secondary"):
+        window = bucket.get(name) or {}
+        windows[name] = {key: window.get(key) for key in ("usedPercent", "windowDurationMins", "resetsAt")}
+    if all(window["usedPercent"] is None for window in windows.values()):
+        return None
+    return {"sampled_at": sampled_at, **windows}
 
 
 def task_snapshots(codex_home, days=30):
@@ -357,6 +376,7 @@ class Scheduler:
         self.quota = None
         self.quota_error = ""
         self.quota_at = 0
+        self.quota_sampled_at = 0
         self.snapshots = []
         self.thread = None
 
@@ -400,10 +420,12 @@ class Scheduler:
             waiting = [dict(r) for r in self.conn.execute("""SELECT * FROM schedule_rules WHERE status='waiting'
                 ORDER BY COALESCE(run_at,quota_after,created_at),created_at""")]
         needs_quota = any(r["trigger"] == "quota" for r in waiting)
-        if needs_quota and time.time() - self.quota_at >= QUOTA_SECONDS:
+        interval = QUOTA_SECONDS if needs_quota else OVERVIEW_QUOTA_SECONDS
+        if time.time() - self.quota_at >= interval:
             self.quota_at = time.time()
             try:
                 self.quota = read_quota()
+                self.quota_sampled_at = time.time()
                 self.quota_error = ""
             except Exception as exc:
                 self.quota = None

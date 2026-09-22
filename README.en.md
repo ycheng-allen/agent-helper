@@ -32,7 +32,7 @@ The Schedule tab shows waiting, running and historical rules. Waiting rules can 
 - **Task monitoring and scheduling**: task status, automatic resume, Project → Task pickers and the queue;
 - **Queue history**: completed, failed, cancelled and attention-needed rules.
 
-Task state is scanned every five seconds. The Overview quota display refreshes every minute. When a quota-dependent rule is waiting, the background scheduler checks live quota about every ten seconds. The refresh button updates the current tab immediately.
+Task state is scanned every five seconds. The Overview reads live quota from the Codex account API about every 30 seconds and refreshes the display every 30 seconds, showing both remaining and used percentages with a sample time. When a quota-dependent rule is waiting, the background scheduler checks live quota about every ten seconds. The refresh button updates the current tab immediately.
 
 ## Install on macOS Apple Silicon
 

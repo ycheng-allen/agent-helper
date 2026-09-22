@@ -33,6 +33,11 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(appScript, context);
+vm.runInContext(`renderQuota({live:{sampled_at:1790000000,primary:{usedPercent:54,resetsAt:1790076538},secondary:{usedPercent:59,resetsAt:1790496841}},latest:{primary_used:99,secondary_used:99}})`, context);
+assert(element('#quota').innerHTML.includes('46%'));
+assert(element('#quota').innerHTML.includes('41%'));
+assert(element('#quota').innerHTML.includes('已用 54%'));
+assert(element('#quota').innerHTML.includes('Codex 账户实时数据'));
 vm.runInContext("setTab('schedule')", context);
 assert.strictEqual(element('#view-overview').hidden, true);
 assert.strictEqual(element('#view-schedule').hidden, false);

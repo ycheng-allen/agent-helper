@@ -1,6 +1,6 @@
 {
   "name": "codex-helper",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Local Codex usage monitor and task scheduler",
   "main": "electron/main.js",
   "scripts": {

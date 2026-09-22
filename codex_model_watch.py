@@ -27,7 +27,7 @@ import sys
 import threading
 import time
 import webbrowser
-from watch_scheduler import Scheduler, available_projects, init_db as init_scheduler_db, next_reset, read_quota, rule_rows, task_snapshots, validate_rule
+from watch_scheduler import Scheduler, available_projects, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows, task_snapshots, validate_rule
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -359,7 +359,10 @@ def api_data(conn, days=0):
         "hourly": hourly, "models": models, "projects": projects,
         "errors_recent": errors_recent,
         "quota": {"latest": quota_latest[0] if quota_latest else None,
-                  "history": list(reversed(quota_hist))},
+                  "history": list(reversed(quota_hist)),
+                  "live": quota_snapshot(g_scheduler.quota, g_scheduler.quota_sampled_at)
+                          if g_scheduler and g_scheduler.quota else None,
+                  "error": g_scheduler.quota_error if g_scheduler else ""},
         "probes": probes,
         "probe_summary": {"total": probe_summary["n"], "swapped": probe_summary["swapped"]},
     }

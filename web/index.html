@@ -178,7 +178,7 @@
 
   <div class="cards" id="cards"></div>
 
-  <div class="panel"><h2>当前额度水位 · 来自本地日志 token_count 事件</h2><div id="quota"></div></div>
+  <div class="panel"><h2>Codex 额度水位</h2><div id="quota"></div></div>
 
   <div class="panel"><h2>会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
 
@@ -312,6 +312,36 @@ function modelBadge(m){
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
+function renderQuota(quota){
+  const live=quota?.live||null, logged=quota?.latest||null, q=live||logged;
+  const qEl=$('#quota');
+  if(!q){qEl.innerHTML='<span style="color:var(--dim)">正在读取 Codex 账户额度…</span>';return;}
+  let raw={};if(!live)try{raw=JSON.parse(logged.raw||'{}');}catch(e){}
+  const p=live?.primary||raw.primary||{},sec=live?.secondary||raw.secondary||{};
+  const used=name=>live?(live[name]||{}).usedPercent:logged[name+'_used'];
+  const reset=window=>{
+    const at=window.resetsAt??window.resets_at;
+    if(at)return '重置 '+new Date(at*1000).toLocaleString('zh-CN',{hour12:false});
+    if(window.reset_after_seconds!=null)return Math.round(window.reset_after_seconds/3600)+'h 后重置';
+    return '';
+  };
+  const bar=(tag,value,window)=>{
+    const valid=value!=null&&Number.isFinite(Number(value));
+    const remaining=valid?Math.max(0,Math.min(100,100-Number(value))):0;
+    const color=!valid?'var(--dim)':remaining<=10?'var(--fail)':remaining<=20?'var(--warn)':'var(--ok)';
+    return `<div class="qbar"><span class="tag">${tag} 剩余</span>`+
+      `<span class="track"><span class="fill" style="width:${remaining}%;background:${color}"></span></span>`+
+      `<span class="pct" style="color:${color}">${valid?Math.round(remaining)+'%':'?'}</span>`+
+      `<span class="hint">${valid?'已用 '+Math.round(Number(value))+'% · ':''}${reset(window)}</span></div>`;
+  };
+  const sample=new Date(live?live.sampled_at*1000:logged.ts);
+  const stamp=Number.isNaN(sample.getTime())?'未知':sample.toLocaleString('zh-CN',{hour12:false});
+  const source=live?'Codex 账户实时数据':'最近一次日志记录（非实时）';
+  qEl.innerHTML=bar('5h',used('primary'),p)+bar('7d',used('secondary'),sec)+
+    `<div class="hint" style="margin-top:4px">${source} · 采样时间 ${stamp}`+
+    (!live&&quota?.error?' · 实时读取失败：'+esc(quota.error):'')+'</div>';
+}
+
 function render(d){
   const s=d.summary||{};
   const ps=d.probe_summary||{};
@@ -323,24 +353,7 @@ function render(d){
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
     `<div class="card"><div class="k">平均轮时长</div><div class="v">${fmtDur(s.avg_duration_ms)}</div><div class="s">含工具调用</div></div>`+
     `<div class="card"><div class="k">探针偷换</div><div class="v ${ps.swapped?'fail':'ok'}">${fmt(ps.swapped||0)}</div><div class="s">共 ${fmt(ps.total||0)} 次探测</div></div>`;
-  const q=(d.quota&&d.quota.latest)||null;
-  const qEl=$('#quota');
-  if(!q){qEl.innerHTML='<span style="color:var(--dim)">日志中还没有额度事件（token_count），使用 Codex 跑几轮后出现</span>';}
-  else{
-    let raw={};try{raw=JSON.parse(q.raw||'{}');}catch(e){}
-    const bar=(tag,v,sub)=>{
-      const w=Math.max(0,Math.min(100,v==null?0:v));
-      const col=v==null?'var(--dim)':w>=100?'var(--fail)':w>=80?'var(--warn)':'var(--ok)';
-      return `<div class="qbar"><span class="tag">${tag}</span>`+
-        `<span class="track"><span class="fill" style="width:${w}%;background:${col}"></span></span>`+
-        `<span class="pct" style="color:${col}">${v==null?'?':Math.round(w)}%</span>`+
-        `<span class="hint">${sub||''}</span></div>`;};
-    const p=raw.primary||{}, sec=raw.secondary||{};
-    const rs=v=>{if(v==null)return'';if(v.reset_at)return '重置 '+String(v.reset_at).slice(0,16).replace('T',' ');
-      if(v.reset_after_seconds!=null)return Math.round(v.reset_after_seconds/3600)+'h 后重置';return '';};
-    qEl.innerHTML=bar('5h',q.primary_used,rs(p))+bar('7d',q.secondary_used,rs(sec))+
-      `<div class="hint" style="margin-top:4px">采样时间 ${String(q.ts).slice(0,19).replace('T',' ')}（额度为 Codex 上报的窗口用量百分比）</div>`;
-  }
+  renderQuota(d.quota);
   const h=d.hourly||[];
   const step=Math.max(1,Math.ceil(h.length/160));
   const pts=h.filter((_,i)=>i%step===0||i===h.length-1);
@@ -622,7 +635,7 @@ async function setAutoResume(){
 const initialTime=new Date(Date.now()+3600000);
 $('#sTime').value=new Date(initialTime.getTime()-initialTime.getTimezoneOffset()*60000).toISOString().slice(0,16);
 setTab(location.hash==='#schedule'?'schedule':'overview',false);
-scheduleFields();loadSchedule();load();setInterval(load,60000);setInterval(loadSchedule,5000);
+scheduleFields();loadSchedule();load();setInterval(load,30000);setInterval(loadSchedule,5000);
 </script>
 </body>
 </html>

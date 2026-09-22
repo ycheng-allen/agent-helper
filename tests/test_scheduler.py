@@ -9,13 +9,16 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from watch_scheduler import Scheduler, available_projects, init_db, next_reset, project_catalog, quota_ready, task_snapshots, validate_rule
+from watch_scheduler import Scheduler, available_projects, init_db, next_reset, project_catalog, quota_ready, quota_snapshot, task_snapshots, validate_rule
 
 
 class SchedulerTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        quota_patch = patch("watch_scheduler.read_quota", return_value={"rateLimits": {"primary": {"usedPercent": 25}}})
+        quota_patch.start()
+        self.addCleanup(quota_patch.stop)
         self.session = "12345678-1234-1234-1234-123456789abc"
         directory = os.path.join(self.tmp.name, "sessions", "2026", "09", "21")
         os.makedirs(directory)
@@ -103,6 +106,17 @@ class SchedulerTest(unittest.TestCase):
                                "secondary": {"usedPercent": 100, "resetsAt": 100}}}
         self.assertEqual(next_reset(data), 100)
         self.assertFalse(quota_ready(data))
+
+    def test_live_quota_uses_codex_account_bucket(self):
+        data = {"rateLimits": {"primary": {"usedPercent": 99}},
+                "rateLimitsByLimitId": {"codex": {
+                    "primary": {"usedPercent": 54, "windowDurationMins": 300, "resetsAt": 100},
+                    "secondary": {"usedPercent": 59, "windowDurationMins": 10080, "resetsAt": 200}},
+                    "other": {"primary": {"usedPercent": 1}}}}
+        snapshot = quota_snapshot(data, 1234)
+        self.assertEqual(snapshot["primary"], {"usedPercent": 54, "windowDurationMins": 300, "resetsAt": 100})
+        self.assertEqual(snapshot["secondary"]["usedPercent"], 59)
+        self.assertEqual(snapshot["sampled_at"], 1234)
 
     def test_auto_resume_creates_one_rule_for_quota_failure(self):
         self.write(True, "Usage limit reached")
