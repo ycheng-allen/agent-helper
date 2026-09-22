@@ -219,3 +219,34 @@ class ZcodeScheduleTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScheduleRuleInsertColumnsTest(unittest.TestCase):
+    """回归：POST /api/schedule 的 INSERT 必须写入 agent 列。
+
+    曾经 INSERT 缺 agent 列，UI/API 建的 ZCode 规则落库后被默认成 codex，
+    「发送下一步」等被路由给 Codex 执行而失败。
+    """
+
+    def test_api_insert_writes_agent_and_params_match(self):
+        import re
+        import os
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        src = open(os.path.join(here, "codex_model_watch.py"), encoding="utf-8").read()
+        inserts = re.findall(r"INSERT INTO schedule_rules\s*\((.*?)\)", src, re.S)
+        self.assertTrue(inserts, "codex_model_watch.py 中找不到 INSERT INTO schedule_rules")
+        for cols in inserts:
+            col_list = [c.strip() for c in cols.replace("\n", " ").split(",")]
+            self.assertIn("agent", col_list,
+                          "INSERT 缺 agent 列，ZCode 规则会静默降级为 codex: %s" % col_list)
+        # 校验 validate_rule 输出覆盖所有命名参数（防止列与参数漂移）
+        rule = validate_rule({"kind": "new", "trigger": "at", "agent": "zcode",
+                              "prompt": "p", "project_mode": "directory", "cwd": CWD,
+                              "run_at": datetime.now(timezone.utc).isoformat()}, [])
+        params = set(re.findall(r":(\w+)", inserts[0]))
+        missing = params - set(rule)
+        self.assertFalse(missing, "validate_rule 缺少 INSERT 所需参数: %s" % missing)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1146,10 +1146,10 @@ class Handler(BaseHTTPRequestHandler):
                             (rule["thread_id"], rule["after_turn_id"])).fetchone():
                         raise ValueError("这个任务的当前轮次已有续跑规则")
                     conn().execute("""INSERT INTO schedule_rules
-                        (id,kind,trigger,thread_id,cwd,project_mode,project_id,project_name,project_parent,
+                        (id,kind,trigger,thread_id,agent,attempts,cwd,project_mode,project_id,project_name,project_parent,
                          prompt,run_at,quota_after,after_turn_id,after_mtime,
                          status,auto,created_at,started_at,finished_at,error,output)
-                         VALUES(:id,:kind,:trigger,:thread_id,:cwd,:project_mode,:project_id,:project_name,:project_parent,
+                         VALUES(:id,:kind,:trigger,:thread_id,:agent,:attempts,:cwd,:project_mode,:project_id,:project_name,:project_parent,
                                 :prompt,:run_at,:quota_after,:after_turn_id,:after_mtime,
                                 :status,:auto,:created_at,:started_at,:finished_at,:error,:output)""", rule)
                     conn().commit()
