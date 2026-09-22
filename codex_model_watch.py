@@ -36,8 +36,8 @@ import threading
 import time
 import webbrowser
 from watch_scheduler import (Scheduler, all_task_snapshots, available_projects, ensure_zcode_provider_config,
-                             init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows,
-                             sprint_window, task_snapshots, validate_rule, validate_sprint)
+                             init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, read_zcode_quota,
+                             rule_rows, sprint_window, task_snapshots, validate_rule, validate_sprint)
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -478,7 +478,9 @@ def api_data(conn, days=0, agent=""):
                   "history": list(reversed(quota_hist)),
                   "live": quota_snapshot(g_scheduler.quota, g_scheduler.quota_sampled_at)
                           if g_scheduler and g_scheduler.quota else None,
-                  "error": g_scheduler.quota_error if g_scheduler else ""},
+                  "error": g_scheduler.quota_error if g_scheduler else "",
+                  "zcode": {"live": g_scheduler.zcode_live if g_scheduler else None,
+                            "error": g_scheduler.zcode_error if g_scheduler else ""}},
         "probes": probes,
         "probe_summary": {"total": probe_summary["n"], "swapped": probe_summary["swapped"]},
     }
@@ -735,10 +737,11 @@ class Handler(BaseHTTPRequestHandler):
                 rule = validate_rule(body, snapshots, g_args.codex_home, projects)
                 if rule["kind"] == "new" and rule["trigger"] == "quota":
                     if rule.get("agent") == "zcode":
-                        raise ValueError("ZCode 暂无实时额度接口，新任务请改用指定时间或关联任务完成触发")
-                    rule["quota_after"] = next_reset(read_quota())
+                        rule["quota_after"] = next_reset(read_zcode_quota())
+                    else:
+                        rule["quota_after"] = next_reset(read_quota())
                     if rule["quota_after"] is None:
-                        raise ValueError("Codex 暂未提供下一次额度刷新时间")
+                        raise ValueError("暂未获取到下一次额度刷新时间")
                 with g_lock:
                     if rule["project_mode"] == "create" and conn().execute("""SELECT 1 FROM schedule_rules
                             WHERE kind='new' AND project_mode='create' AND cwd=? AND status IN ('waiting','running') LIMIT 1""",

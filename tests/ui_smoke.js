@@ -8,7 +8,7 @@ const ids = [...markup.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 assert.strictEqual(ids.length, new Set(ids).size, 'HTML IDs must be unique');
 for (const id of ['tab-overview', 'tab-schedule', 'tab-sprint', 'view-overview', 'view-schedule',
                   'view-sprint', 'sList', 'agentCodex', 'agentZcode', 'quotaPanel', 'probePanel',
-                  'zcodeNote', 'sAutoPanel', 'zSchedNote', 'optQuota']) {
+                  'sAutoPanel', 'zSchedNote', 'optQuota']) {
   assert(ids.includes(id), `Missing ${id}`);
 }
 
@@ -51,9 +51,8 @@ assert.strictEqual(element('#view-schedule').hidden, false);
 assert.strictEqual(element('#tab-schedule')['aria-selected'], 'true');
 // agent 切换：ZCode 空间隐藏 Codex 专属面板、显示玩命蹬
 vm.runInContext("switchAgent('zcode')", context);
-assert.strictEqual(element('#quotaPanel').hidden, true);
+assert.strictEqual(element('#quotaPanel').hidden, false);  // ZCode 空间也显示实时额度
 assert.strictEqual(element('#probePanel').hidden, true);
-assert.strictEqual(element('#zcodeNote').hidden, false);
 assert.strictEqual(element('#sAutoPanel').hidden, true);
 assert.strictEqual(element('#zSchedNote').hidden, false);
 assert.strictEqual(element('#tab-sprint').hidden, false);

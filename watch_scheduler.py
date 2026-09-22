@@ -163,6 +163,45 @@ def zcode_env(credentials_path=None):
     return env, ""
 
 
+ZCODE_QUOTA_URL = "https://open.bigmodel.cn/api/monitor/usage/quota/limit"
+_ZCODE_UNIT_MINS = {2: 1, 3: 60, 4: 1440, 6: 10080}  # observed: 3&number=5 → 5h window, 6&number=1 → week
+
+
+def zcode_usage_raw(credentials_path=None, timeout=10):
+    """Fetch ZCode plan quota windows and normalize them to the Codex rateLimits shape.
+
+    GET {ZCODE_QUOTA_URL} with Authorization: <coding-plan api key>. Response limits are
+    CREDIT_LIMIT entries; the smallest window becomes "primary", the other "secondary".
+    """
+    import urllib.request
+    import urllib.error
+    key = zcode_api_key(credentials_path)
+    req = urllib.request.Request(ZCODE_QUOTA_URL, headers={"Authorization": key})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if payload.get("code") != 200:
+        raise RuntimeError("ZCode 额度接口返回异常: " + str(payload.get("msg") or payload.get("code"))[:120])
+    windows = []
+    for limit in (payload.get("data") or {}).get("limits") or []:
+        mins = _ZCODE_UNIT_MINS.get(limit.get("unit"))
+        pct = limit.get("percentage")
+        if mins is None or pct is None:
+            continue
+        windows.append({"windowDurationMins": mins * int(limit.get("number") or 1),
+                        "usedPercent": float(pct),
+                        "resetsAt": (limit.get("nextResetTime") or 0) / 1000 or None})
+    windows.sort(key=lambda w: w["windowDurationMins"])
+    if not windows:
+        raise RuntimeError("ZCode 额度响应中没有可用窗口")
+    names = ["primary", "secondary"]
+    return {"rateLimits": {names[i]: w for i, w in enumerate(windows[:2])}}
+
+
+def read_zcode_quota(credentials_path=None, timeout=10):
+    """Alias kept for symmetry with read_quota()."""
+    return zcode_usage_raw(credentials_path, timeout)
+
+
 def project_catalog(codex_home, include_mirrors=False):
     """Read saved local Codex projects; never mutate Codex's private state database."""
     db = _state_db(codex_home)
@@ -709,6 +748,10 @@ class Scheduler:
         self.quota_error = ""
         self.quota_at = 0
         self.quota_sampled_at = 0
+        self.zcode_live = None
+        self.zcode_quota = None
+        self.zcode_error = ""
+        self.zcode_quota_at = 0
         self.snapshots = []
         self.sprint_procs = {}
         self.thread = None
@@ -754,7 +797,7 @@ class Scheduler:
                 self.conn.commit()
             waiting = [dict(r) for r in self.conn.execute("""SELECT * FROM schedule_rules WHERE status='waiting'
                 ORDER BY COALESCE(run_at,quota_after,created_at),created_at""")]
-        needs_quota = any(r["trigger"] == "quota" and (r.get("agent") or "codex") != "zcode" for r in waiting)
+        needs_quota = any(r["trigger"] == "quota" for r in waiting)
         interval = QUOTA_SECONDS if needs_quota else OVERVIEW_QUOTA_SECONDS
         if "codex" in self.agents and time.time() - self.quota_at >= interval:
             self.quota_at = time.time()
@@ -765,6 +808,16 @@ class Scheduler:
             except Exception as exc:
                 self.quota = None
                 self.quota_error = str(exc)[:200]
+        if "zcode" in self.agents and time.time() - self.zcode_quota_at >= interval:
+            self.zcode_quota_at = time.time()
+            try:
+                self.zcode_quota = zcode_usage_raw()
+                self.zcode_live = quota_snapshot(self.zcode_quota, time.time())
+                self.zcode_error = ""
+            except Exception as exc:
+                self.zcode_quota = None
+                self.zcode_live = None
+                self.zcode_error = str(exc)[:200]
         by_id = {t["id"]: t for t in self.snapshots}
         for rule in waiting:
             target = by_id.get(rule["thread_id"])
@@ -778,11 +831,13 @@ class Scheduler:
                     err_ok = turn.get("status") == "failed" and any(
                         x in (turn.get("error", "") or "").replace("_", " ").lower() for x in QUOTA_ERRORS)
                     if (rule.get("agent") or "codex") == "zcode":
-                        # ZCode 没有实时额度接口：中断后按固定间隔重试，直到最新轮次不再报限流错误
-                        # 首次尝试立即执行；之后的重试与上一次结束保持 ZCODE_RETRY_SECONDS 间隔
-                        attempts = rule.get("attempts") or 0
-                        wait_ok = attempts == 0 or time.time() - (rule["finished_at"] or 0) >= ZCODE_RETRY_SECONDS
-                        due = err_ok and wait_ok
+                        # ZCode 续跑：优先用实时额度窗口判断；额度未知时退回固定间隔重试
+                        if self.zcode_quota:
+                            due = err_ok and quota_ready(self.zcode_quota)
+                        else:
+                            attempts = rule.get("attempts") or 0
+                            wait_ok = attempts == 0 or time.time() - (rule["finished_at"] or 0) >= ZCODE_RETRY_SECONDS
+                            due = err_ok and wait_ok
                     else:
                         due = err_ok and quota_ready(self.quota or {})
                 else:

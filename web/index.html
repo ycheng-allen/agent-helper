@@ -210,11 +210,7 @@
 
   <div class="cards" id="cards"></div>
 
-  <div class="panel" id="quotaPanel"><h2>Codex 额度水位</h2><div id="quota"></div></div>
-
-  <div class="panel" id="zcodeNote" hidden><h2>ZCode 使用说明</h2>
-    <div style="color:var(--dim);font-size:12px;line-height:1.8">ZCode 按会话记录用量，没有账户级实时额度窗口，因此这里展示模型 / 项目 / 错误统计。<br>
-    想在闲时免费额度里批量跑任务？去 <a href="#zcode/sprint" style="color:var(--accent)">玩命蹬</a> 建一个时间窗口队列。</div></div>
+  <div class="panel" id="quotaPanel"><h2 id="quotaTitle">额度水位</h2><div id="quota"></div></div>
 
   <div class="panel"><h2>会话轮次 / 错误 · 按小时趋势</h2><canvas id="cTrend"></canvas></div>
 
@@ -258,7 +254,7 @@
         </div>
         <div class="schedule-panel" id="zSchedNote" hidden>
           <span class="auto-copy"><b>ZCode 续跑说明</b>
-            <small>ZCode 没有实时额度接口。勾选"续跑任务"后，任务因限流中断会每 5 分钟自动重试（最多 8 次），恢复后即接续原对话。</small></span>
+            <small>任务因限流中断后，续跑会等待 ZCode 额度窗口恢复（每 30 秒采样一次；额度不可读时退回每 5 分钟重试，最多 8 次）。</small></span>
         </div>
         <form class="schedule-panel" id="sForm" onsubmit="event.preventDefault();addSchedule()">
           <h2>创建一次性规则</h2><p class="sub">选择要做的事，填写触发条件和指令。</p>
@@ -313,7 +309,7 @@
   </section>
 
   <section id="view-sprint" role="tabpanel" aria-labelledby="tab-sprint" hidden>
-    <div class="schedule-head"><div><h1>免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务。并行数 1 即串行。</p></div>
+    <div class="schedule-head"><div><h1>免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务。适合闲时免费额度。并行数 1 即串行。</p></div>
       <div class="schedule-summary" id="spSummary"></div></div>
     <div class="schedule-layout">
       <div>
@@ -415,8 +411,9 @@ function modelBadge(m){
 const fmtDur=ms=>!ms?'—':(ms>90000?Math.round(ms/60000)+'分':Math.round(ms/1000)+'s');
 const fmtTok=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);
 
-function renderQuota(quota){
-  const live=quota?.live||null, logged=quota?.latest||null, q=live||logged;
+function renderQuota(quota,agent='codex'){
+  const live=agent==='zcode'?(quota?.zcode?.live||null):(quota?.live||null);
+  const logged=quota?.latest||null, q=live||logged;
   const qEl=$('#quota');
   if(!q){qEl.innerHTML='<span style="color:var(--dim)">正在读取 Codex 账户额度…</span>';return;}
   let raw={};if(!live)try{raw=JSON.parse(logged.raw||'{}');}catch(e){}
@@ -439,10 +436,12 @@ function renderQuota(quota){
   };
   const sample=new Date(live?live.sampled_at*1000:logged.ts);
   const stamp=Number.isNaN(sample.getTime())?'未知':sample.toLocaleString('zh-CN',{hour12:false});
-  const source=live?'Codex 账户实时数据':'最近一次日志记录（非实时）';
-  qEl.innerHTML=bar('5h',used('primary'),p)+bar('7d',used('secondary'),sec)+
+  const source=live?(agent==='zcode'?'ZCode 账户实时数据':'Codex 账户实时数据')
+    :(agent==='zcode'?'暂无采样（等待后台读取 ZCode 额度）':'最近一次日志记录（非实时）');
+  const labels=agent==='zcode'?['5h','周']:['5h','7d'];
+  qEl.innerHTML=bar(labels[0],used('primary'),p)+bar(labels[1],used('secondary'),sec)+
     `<div class="hint" style="margin-top:4px">${source} · 采样时间 ${stamp}`+
-    (!live&&quota?.error?' · 实时读取失败：'+esc(quota.error):'')+'</div>';
+    (!live&&(agent==='zcode'?quota?.zcode?.error:quota?.error)?' · 实时读取失败：'+esc(agent==='zcode'?quota.zcode.error:quota.error):'')+'</div>';
 }
 
 function render(d){
@@ -456,7 +455,7 @@ function render(d){
     `<div class="card"><div class="k">其他错误</div><div class="v ${Math.max(0,(s.errors||0)-(s.capacity||0))?'swap':''}">${fmt(Math.max(0,(s.errors||0)-(s.capacity||0)))}</div><div class="s">限流 / 网络等</div></div>`+
     `<div class="card"><div class="k">平均轮时长</div><div class="v">${fmtDur(s.avg_duration_ms)}</div><div class="s">含工具调用</div></div>`+
     `<div class="card"><div class="k">探针偷换</div><div class="v ${ps.swapped?'fail':'ok'}">${fmt(ps.swapped||0)}</div><div class="s">共 ${fmt(ps.total||0)} 次探测</div></div>`;
-  renderQuota(d.quota);
+  renderQuota(d.quota,curAgent);
   const h=d.hourly||[];
   const step=Math.max(1,Math.ceil(h.length/160));
   const pts=h.filter((_,i)=>i%step===0||i===h.length-1);
@@ -528,11 +527,10 @@ function applyAgentFrame(){
   $('#agentZcode').setAttribute('aria-selected',String(z));
   $('#tab-sprint').hidden=!z;
   $('#ovTitle').textContent=z?'ZCode 监控总览':'Codex 监控总览';
-  $('#quotaPanel').hidden=z;
+  $('#quotaTitle').textContent=z?'ZCode 额度水位':'Codex 额度水位';
   $('#probePanel').hidden=z;
-  $('#zcodeNote').hidden=!z;
   $('#schedSub').textContent=z
-    ?'让 ZCode 在约定时间或任务完成后继续工作；中断续跑采用定时重试。'
+    ?'让 ZCode 在约定时间或任务完成后继续工作；中断续跑会等待实时额度恢复。'
     :'让 Codex 在约定的时间或任务完成后继续工作。';
   $('#sAutoPanel').hidden=z;
   $('#zSchedNote').hidden=!z;
