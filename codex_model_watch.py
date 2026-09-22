@@ -37,7 +37,7 @@ import time
 import webbrowser
 from watch_scheduler import (Scheduler, all_task_snapshots, available_projects, ensure_zcode_provider_config,
                              init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota, rule_rows,
-                             task_snapshots, validate_rule)
+                             sprint_window, task_snapshots, validate_rule, validate_sprint)
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -628,10 +628,75 @@ class Handler(BaseHTTPRequestHandler):
                             "auto_resume": bool(conn().execute("SELECT 1 FROM schedule_settings WHERE key='auto_resume_since'").fetchone()),
                             "quota_error": g_scheduler.quota_error if g_scheduler else ""})
             return
+        if path == "/api/sprint":
+            if self.headers.get("Host", "") != "127.0.0.1:%d" % g_args.port:
+                self._json({"error": "仅允许本地面板访问"}, 403)
+                return
+            with g_lock:
+                sprints = [dict(r) for r in conn().execute(
+                    "SELECT * FROM sprints ORDER BY created_at DESC LIMIT 20")]
+                tasks = {}
+                for s in sprints:
+                    tasks[s["id"]] = [dict(r) for r in conn().execute(
+                        "SELECT id,prompt,position,status,session_id,error,started_at,finished_at "
+                        "FROM sprint_tasks WHERE sprint_id=? ORDER BY position", (s["id"],))]
+                for s in sprints:
+                    if s["status"] in ("waiting", "running"):
+                        s["window"] = sprint_window(s)
+                self._json({"sprints": sprints, "tasks": tasks,
+                            "projects": available_projects(conn(), g_args.codex_home, g_args.zcode_home),
+                            "demo": g_state["demo"]})
+            return
         self.send_response(404)
         self.end_headers()
 
     def do_POST(self):
+        if self.path.split("?")[0] == "/api/sprint":
+            if not self._local_json_request() or g_state["demo"]:
+                self._json({"error": "只接受本地面板的真实模式请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 500000:
+                    raise ValueError("请求过大")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                if str(body.get("agent") or "zcode") != "zcode":
+                    raise ValueError("玩命蹬模式目前仅支持 ZCode")
+                with g_lock:
+                    projects = available_projects(conn(), g_args.codex_home, g_args.zcode_home)
+                sp = validate_sprint(body, projects)
+                with g_lock:
+                    conn().execute("""INSERT INTO sprints
+                        (id,name,agent,kind,start_hm,end_hm,start_at,end_at,cwd,concurrency,
+                         status,created_at,stopped_at)
+                        VALUES(:id,:name,:agent,:kind,:start_hm,:end_hm,:start_at,:end_at,:cwd,
+                               :concurrency,:status,:created_at,:stopped_at)""", sp)
+                    for t in sp["tasks"]:
+                        conn().execute("""INSERT INTO sprint_tasks
+                            (id,sprint_id,prompt,position,status,session_id,error,output,
+                             started_at,finished_at,attempts)
+                            VALUES(:id,:sprint_id,:prompt,:position,:status,:session_id,:error,:output,
+                                   :started_at,:finished_at,:attempts)""", t)
+                    conn().commit()
+                self._json({"sprint": {k: v for k, v in sp.items() if k != "tasks"},
+                            "task_count": len(sp["tasks"])}, 201)
+            except (ValueError, TypeError, RuntimeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
+        if self.path.split("?")[0] == "/api/sprint/stop":
+            if not self._local_json_request():
+                self._json({"error": "只接受本地面板的 JSON 请求"}, 403)
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                sid = str(body.get("id") or "")
+                if g_scheduler:
+                    g_scheduler.stop_sprint(sid)
+                self._json({"stopped": True})
+            except (ValueError, TypeError) as exc:
+                self._json({"error": str(exc)}, 400)
+            return
         if self.path.split("?")[0] == "/api/schedule/auto-resume":
             if not self._local_json_request() or g_state["demo"]:
                 self._json({"error": "只接受本地面板的真实模式请求"}, 403)

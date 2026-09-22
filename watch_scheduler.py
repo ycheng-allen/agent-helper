@@ -557,6 +557,17 @@ def validate_rule(body, snapshots, codex_home=None, projects=None):
 
 
 def init_db(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS sprints(
+        id TEXT PRIMARY KEY, name TEXT, agent TEXT DEFAULT 'zcode',
+        kind TEXT, start_hm TEXT, end_hm TEXT, start_at REAL, end_at REAL,
+        cwd TEXT, concurrency INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'waiting', created_at REAL, stopped_at REAL)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS sprint_tasks(
+        id TEXT PRIMARY KEY, sprint_id TEXT, prompt TEXT, position INTEGER,
+        status TEXT DEFAULT 'pending', session_id TEXT, error TEXT, output TEXT,
+        started_at REAL, finished_at REAL, attempts INTEGER DEFAULT 0)""")
+    # 应用重启时把上一次运行遗留的 running 任务放回队列
+    conn.execute("UPDATE sprint_tasks SET status='pending', started_at=NULL WHERE status='running'")
     conn.execute("CREATE TABLE IF NOT EXISTS schedule_settings(key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("""CREATE TABLE IF NOT EXISTS helper_projects(
         id TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE, created_at REAL NOT NULL)""")
@@ -581,6 +592,84 @@ def init_db(conn):
     conn.commit()
 
 
+def parse_hm(text):
+    """Parse 'HH:MM' local wall time; returns (h, m)."""
+    m = re.match(r"^([01]?\d|2[0-3]):([0-5]\d)$", str(text or "").strip())
+    if not m:
+        raise ValueError("时间格式应为 HH:MM")
+    return int(m.group(1)), int(m.group(2))
+
+
+def sprint_window(sp, now=None):
+    """Active or next [start, end) window in epoch seconds for a sprint row."""
+    now = time.time() if now is None else now
+    if sp["kind"] == "once":
+        return sp["start_at"], sp["end_at"]
+
+    def at(hm, base):
+        h, m = hm
+        d = datetime.fromtimestamp(base).replace(hour=h, minute=m, second=0, microsecond=0)
+        return d.timestamp()
+
+    sh, sm = parse_hm(sp["start_hm"])
+    eh, em = parse_hm(sp["end_hm"])
+    cands = []
+    for base in (now - 86400, now, now + 86400):
+        s, e = at((sh, sm), base), at((eh, em), base)
+        if e <= s:
+            e += 86400  # 窗口跨午夜
+        cands.append((s, e))
+    for a, b in cands:
+        if a <= now < b:
+            return a, b
+    return min((c for c in cands if c[0] > now), key=lambda c: c[0])
+
+
+def validate_sprint(body, projects):
+    kind = body.get("kind")
+    if kind not in ("daily", "once"):
+        raise ValueError("请选择窗口类型（每日或一次性）")
+    cwd_input = str(body.get("cwd") or "").strip()
+    cwd = os.path.realpath(os.path.expanduser(cwd_input)) if cwd_input else ""
+    if not os.path.isdir(cwd):
+        raise ValueError("请选择任务工作目录")
+    try:
+        concurrency = int(body.get("concurrency") or 1)
+    except (TypeError, ValueError):
+        concurrency = 1
+    concurrency = max(1, min(6, concurrency))
+    prompts = [str(p).strip() for p in (body.get("prompts") or []) if str(p).strip()]
+    if not prompts:
+        raise ValueError("任务队列不能为空")
+    if len(prompts) > 50:
+        raise ValueError("单次最多 50 个任务")
+    if any(len(p) > 20000 for p in prompts):
+        raise ValueError("单个任务 Prompt 不能超过 20000 字")
+    sp = {"id": str(uuid.uuid4()), "name": str(body.get("name") or "").strip()[:60] or "玩命蹬",
+          "agent": "zcode", "kind": kind, "cwd": cwd, "concurrency": concurrency,
+          "status": "waiting", "created_at": time.time(), "stopped_at": None,
+          "start_hm": None, "end_hm": None, "start_at": None, "end_at": None}
+    if kind == "daily":
+        parse_hm(body.get("start_hm"))  # 格式校验
+        parse_hm(body.get("end_hm"))
+        sp["start_hm"] = str(body.get("start_hm")).strip()
+        sp["end_hm"] = str(body.get("end_hm")).strip()
+    else:
+        try:
+            start = datetime.fromisoformat(str(body.get("start_at") or "").replace("Z", "+00:00")).timestamp()
+            end = datetime.fromisoformat(str(body.get("end_at") or "").replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            raise ValueError("请输入带时区的窗口起止时间")
+        if end <= start:
+            raise ValueError("结束时间必须晚于开始时间")
+        sp["start_at"], sp["end_at"] = start, end
+    sp["tasks"] = [{"id": str(uuid.uuid4()), "sprint_id": sp["id"], "prompt": p,
+                    "position": i, "status": "pending", "session_id": None, "error": None,
+                    "output": None, "started_at": None, "finished_at": None, "attempts": 0}
+                   for i, p in enumerate(prompts)]
+    return sp
+
+
 def rule_rows(conn):
     active = conn.execute("""SELECT * FROM schedule_rules WHERE status IN ('waiting','running')
         ORDER BY COALESCE(run_at,quota_after,created_at),created_at""").fetchall()
@@ -600,6 +689,7 @@ class Scheduler:
         self.quota_at = 0
         self.quota_sampled_at = 0
         self.snapshots = []
+        self.sprint_procs = {}
         self.thread = None
 
     def start(self):
@@ -685,6 +775,153 @@ class Scheduler:
                 due = False
             if due:
                 self.dispatch(rule)
+        if "zcode" in self.agents:
+            self.tick_sprints()
+
+    # ---------------- 免费玩命蹬：ZCode 窗口队列 ----------------
+
+    def tick_sprints(self):
+        now = time.time()
+        with self.lock:
+            sprints = [dict(r) for r in self.conn.execute(
+                "SELECT * FROM sprints WHERE status IN ('waiting','running')")]
+        for sp in sprints:
+            a, b = sprint_window(sp, now)
+            if now < a:
+                continue
+            if now >= b:
+                self.finish_sprint(sp["id"], "done", "时间窗口结束")
+                continue
+            if sp["status"] == "waiting":
+                with self.lock:
+                    self.conn.execute("UPDATE sprints SET status='running' WHERE id=?", (sp["id"],))
+                    self.conn.commit()
+            self.fill_sprint_slots(sp)
+
+    def fill_sprint_slots(self, sp):
+        slots = pending = []
+        with self.lock:
+            running = self.conn.execute(
+                "SELECT COUNT(*) FROM sprint_tasks WHERE sprint_id=? AND status='running'",
+                (sp["id"],)).fetchone()[0]
+            slots = max(0, int(sp["concurrency"] or 1) - running)
+            if slots:
+                pending = [dict(r) for r in self.conn.execute(
+                    "SELECT * FROM sprint_tasks WHERE sprint_id=? AND status='pending' ORDER BY position LIMIT ?",
+                    (sp["id"], slots))]
+            for t in pending:
+                self.conn.execute(
+                    "UPDATE sprint_tasks SET status='running', started_at=?, attempts=COALESCE(attempts,0)+1 WHERE id=?",
+                    (time.time(), t["id"]))
+            left = self.conn.execute(
+                "SELECT COUNT(*) FROM sprint_tasks WHERE sprint_id=? AND status IN ('pending','running')",
+                (sp["id"],)).fetchone()[0]
+            if left == 0:
+                self.conn.execute(
+                    "UPDATE sprints SET status='done', stopped_at=? WHERE id=? AND status IN ('waiting','running')",
+                    (time.time(), sp["id"]))
+            self.conn.commit()
+        for t in pending:
+            self.launch_sprint_task(sp, t)
+
+    def launch_sprint_task(self, sp, task):
+        base = zcode_cmd()
+        env, env_error = zcode_env()
+        if base is None or env is None:
+            with self.lock:
+                self.conn.execute(
+                    "UPDATE sprint_tasks SET status='failed', error=?, finished_at=? WHERE id=?",
+                    (env_error or "未找到 ZCode CLI", time.time(), task["id"]))
+                self.conn.commit()
+            return
+        cmd = [*base, "--prompt", task["prompt"], "--cwd", sp["cwd"], "--json"]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, cwd=sp["cwd"],
+                                    env={**os.environ, **env}, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except Exception as exc:
+            with self.lock:
+                self.conn.execute(
+                    "UPDATE sprint_tasks SET status='failed', error=?, finished_at=? WHERE id=?",
+                    (str(exc)[:500], time.time(), task["id"]))
+                self.conn.commit()
+            return
+        self.sprint_procs[task["id"]] = proc
+        threading.Thread(target=self._watch_sprint_task, args=(sp["id"], sp["cwd"], task["id"], proc),
+                         daemon=True).start()
+
+    def _watch_sprint_task(self, sprint_id, cwd, task_id, proc):
+        try:
+            out, errout = proc.communicate()
+        except Exception:
+            out, errout = "", ""
+        self.sprint_procs.pop(task_id, None)
+        rc = proc.returncode
+        sess = ""
+        match = re.search(r"sess_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                          out or "")
+        if match:
+            sess = match.group(0)
+        with self.lock:
+            row = self.conn.execute("SELECT status FROM sprint_tasks WHERE id=?", (task_id,)).fetchone()
+            if row and row["status"] == "running":
+                self.conn.execute(
+                    "UPDATE sprint_tasks SET status=?, session_id=?, output=?, error=?, finished_at=? WHERE id=?",
+                    ("done" if rc == 0 else "failed", sess or None, (out or "")[-2000:] or None,
+                     (errout or "")[-800:] if rc else None, time.time(), task_id))
+            self.conn.commit()
+        # 任务完成立即补位，避免串行模式下最长 5 秒的空档
+        try:
+            sprint = None
+            with self.lock:
+                sprint = self.conn.execute(
+                    "SELECT * FROM sprints WHERE id=?", (sprint_id,)).fetchone()
+            if sprint and sprint["status"] == "running":
+                a, b = sprint_window(sprint)
+                if a <= time.time() < b:
+                    self.fill_sprint_slots(dict(sprint))
+        except Exception:
+            pass
+
+    def finish_sprint(self, sprint_id, status, note):
+        """Terminate all running tasks, skip pending, close the sprint."""
+        killed = []
+        with self.lock:
+            row = self.conn.execute("SELECT status FROM sprints WHERE id=?", (sprint_id,)).fetchone()
+            if not row or row["status"] not in ("waiting", "running"):
+                return
+            self.conn.execute("UPDATE sprints SET status=?, stopped_at=? WHERE id=?",
+                              (status, time.time(), sprint_id))
+            for t in self.conn.execute(
+                    "SELECT id FROM sprint_tasks WHERE sprint_id=? AND status='running'",
+                    (sprint_id,)).fetchall():
+                killed.append(t["id"])
+                self.conn.execute(
+                    "UPDATE sprint_tasks SET status='stopped', finished_at=?, error=? WHERE id=?",
+                    (time.time(), note, t["id"]))
+            self.conn.execute(
+                "UPDATE sprint_tasks SET status='skipped', finished_at=? WHERE sprint_id=? AND status='pending'",
+                (time.time(), sprint_id))
+            self.conn.commit()
+        procs = [(tid, self.sprint_procs.pop(tid)) for tid in killed if tid in self.sprint_procs]
+        for _, proc in procs:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        if procs:
+            def kill_late():
+                time.sleep(5)
+                for _, proc in procs:
+                    try:
+                        if proc.poll() is None:
+                            proc.kill()
+                    except Exception:
+                        pass
+            threading.Thread(target=kill_late, daemon=True).start()
+
+    def stop_sprint(self, sprint_id):
+        self.finish_sprint(sprint_id, "stopped", "手动停止")
 
     def dispatch(self, rule):
         with self.lock:

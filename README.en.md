@@ -61,6 +61,8 @@ This is a local helper, not a cloud queue. It cannot trigger work while the app 
 
 ZCode support covers usage statistics plus experimental scheduling. The task picker lists recent ZCode sessions and accepts new-task (at time / after another task), follow-up and resume rules; ZCode resume retries every 5 minutes after a rate-limit interruption (up to 8 attempts) instead of relying on live quota.
 
+The "玩命蹬" (sprint) tab is ZCode-exclusive, built for off-peak free quota: define a time window (a daily window like 00:00–08:00, crossing midnight supported, or a one-off window) and queue up to 50 prompts. When the window opens, tasks run at the configured concurrency — 1 means serial, N (max 6) means up to N in parallel. When the window ends or you hit stop, running tasks are terminated (SIGTERM, then SIGKILL after 5s) and the remaining queue is marked skipped; queues survive app restarts.
+
 ZCode's headless CLI ships without a usable default model (model selection is guarded by the desktop app). Helper decrypts the local coding-plan API key from `~/.zcode/v2/credentials.json`, writes a standalone personal provider config to `~/.codex-model-watch/zcode-provider-config.json` (mode 0600), and injects it via `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` — ZCode's own files are never modified; rotated API keys trigger an automatic refresh and retry. Point `ZCODE_BIN` at a custom CLI to override discovery. The probe and quota panels remain Codex-only. By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
 
 ## License
