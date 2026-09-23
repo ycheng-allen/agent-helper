@@ -4,7 +4,7 @@
 
 > 你舍不得骑的自行车，别人站起来蹬，agent helper，帮你站起来蹬！
 
-Agent Helper（原名 Codex Helper）是一个跑在本机的 Codex / ZCode 任务监控与排程助手。它盯着正在工作的任务，记住你想做的下一步，在额度恢复、前一项任务结束或指定时间到达时，替你把下一句 Prompt 送回正确的 Codex 对话。总览页同时统计 Codex 与 ZCode（只读导入 `~/.zcode/cli/db/` 的用量数据库）的模型使用、token 与错误。
+Agent Helper是一个跑在本机的 Codex / ZCode 任务监控与排程助手。它盯着正在工作的任务，记住你想做的下一步，在额度恢复、前一项任务结束或指定时间到达时，替你把下一句 Prompt 送回正确的 Codex 对话。总览页同时统计 Codex 与 ZCode（只读导入 `~/.zcode/cli/db/` 的用量数据库）的模型使用、token 与错误。
 
 简单说：你负责提出宏伟目标，Codex 负责写代码，Codex Helper 负责在大家都快忘了这件事的时候把工作接起来。
 
