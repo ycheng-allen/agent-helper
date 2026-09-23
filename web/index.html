@@ -228,7 +228,7 @@
 
   <div class="panel"><h2 data-i18n="modelDetail">本月模型费用明细</h2><div style="overflow-x:auto"><table id="tStatModels"></table></div></div>
 
-  <div class="foot">费用为公开 API 牌价折算（汇率可在 ~/.codex-model-watch/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
+  <div class="foot">费用为公开 API 牌价折算（汇率可在 ~/.agent-helper/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
   </section>
 
   <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
@@ -286,8 +286,8 @@
     <div style="overflow-x:auto"><table id="tZProbe"></table></div>
   </div>
 
-  <div class="foot" data-i18n="ovFoot">所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
-    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.codex-model-watch/pricing.json 覆盖），非实际账单</div>
+  <div class="foot" data-i18n="ovFoot">所有数据仅保存在本机（~/.agent-helper/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）·
+    已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.agent-helper/pricing.json 覆盖），非实际账单</div>
   </section>
 
   <section id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
@@ -528,8 +528,8 @@ const I18N={
   sampled:{ch:'采样时间',en:'sampled'}, readFail:{ch:'实时读取失败',en:'live read failed'},
   pendingQueue:{ch:'待跑队列（可拖动排序）',en:'Pending queue (drag to reorder)'},
   queueEmpty:{ch:'队列已空',en:'Queue empty'},
-  costNote:{ch:'费用为公开 API 牌价折算（汇率可在 ~/.codex-model-watch/pricing.json 调整），非实际账单；每日趋势取最近 30 天。',
-            en:'Costs are converted at public API list rates (tune rate in ~/.codex-model-watch/pricing.json); not an actual bill. Daily trend covers the last 30 days.'},
+  costNote:{ch:'费用为公开 API 牌价折算（汇率可在 ~/.agent-helper/pricing.json 调整），非实际账单；每日趋势取最近 30 天。',
+            en:'Costs are converted at public API list rates (tune rate in ~/.agent-helper/pricing.json); not an actual bill. Daily trend covers the last 30 days.'},
   r30:{ch:'最近 30 天',en:'Last 30 days'}, rMonth:{ch:'本月',en:'This month'},
   trigNow:{ch:'立即执行',en:'Run now'}, trigAt:{ch:'指定时间',en:'At time'},
   trigQuotaNew:{ch:'额度刷新后 · 预计',en:'After quota reset · est.'},
@@ -562,8 +562,8 @@ const I18N={
   probeHintC:{ch:'用本地 Codex 登录态发一条最小请求，读取服务端实际派出的模型；每次仅消耗极少量额度',en:'Sends a minimal request with your local Codex login to read the actually served model; uses a tiny quota'},
   probeHintZ:{ch:'用 ZCode 无头 CLI 以指定模型发一条最小请求，从会话用量反查实际派出的模型；消耗极少量额度',en:'Runs a minimal headless ZCode request with the picked model, then reads the served model from session usage; tiny quota'},
   probeTry:{ch:'还没有探测记录 —— 在上面输入模型名点「立即探测」试试',en:'No probes yet — pick a model above and hit Probe'},
-  ovFoot:{ch:'所有数据仅保存在本机（~/.codex-model-watch/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）· 已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.codex-model-watch/pricing.json 覆盖），非实际账单',
-         en:'All data stays local (~/.codex-model-watch/). Sources: ~/.codex/sessions/ logs (Codex) and ~/.zcode/cli/db/ usage DB (ZCode, read-only). Known limit: Codex normalizes swapped models into local logs, so swaps can only be verified live by the probe. Costs are list-price estimates (override in ~/.codex-model-watch/pricing.json), not real bills.'},
+  ovFoot:{ch:'所有数据仅保存在本机（~/.agent-helper/）· 数据来自 ~/.codex/sessions/ 会话日志（Codex）与 ~/.zcode/cli/db/ 用量数据库（ZCode，只读）· 已知限制：Codex 会把被偷换后的模型一致化写入本地日志，因此「偷换」只能靠探针即时验证 · 费用为公开 API 牌价折算（可用 ~/.agent-helper/pricing.json 覆盖），非实际账单',
+         en:'All data stays local (~/.agent-helper/). Sources: ~/.codex/sessions/ logs (Codex) and ~/.zcode/cli/db/ usage DB (ZCode, read-only). Known limit: Codex normalizes swapped models into local logs, so swaps can only be verified live by the probe. Costs are list-price estimates (override in ~/.agent-helper/pricing.json), not real bills.'},
   schedFoot:{ch:'每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度；ZCode 任务中断后每 5 分钟自动重试（最多 8 次）。电脑睡眠期间不会触发，唤醒后继续检查。',
              en:'Tasks are checked every 5s; Codex live quota is read every ~10s while waiting; interrupted ZCode tasks retry every 5 minutes (max 8). Nothing fires while the computer sleeps.'},
   sprintFoot:{ch:'每 5 秒检查一次窗口与队列；窗口结束时先 terminate、5 秒后强杀残留进程。电脑睡眠期间窗口照常按墙钟判定。',

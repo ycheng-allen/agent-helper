@@ -47,7 +47,7 @@ Agent Helper（原名 Codex Helper）是一个跑在本机的 Codex / ZCode 任�
 
 ### macOS Apple Silicon
 
-下载 [Agent Helper ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest)，拖入“应用程序”后启动。当前构建未经过 Apple Developer ID 签名，首次打开时可在 Finder 中右键选择“打开”。
+下载 [Agent Helper ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest)，拖入“应用程序”后启动。当前构建未经过 Apple Developer ID 签名，首次打开时可在 Finder 中右键选择“打开”。
 
 也可以从源码构建：
 
@@ -63,8 +63,8 @@ npm run dist
 要求 Python 3.8+、Node.js 和本机已登录的 `codex` CLI：
 
 ```bash
-git clone https://github.com/Allencheng97/codex-helper.git
-cd codex-helper
+git clone https://github.com/ycheng-allen/agent-helper.git
+cd agent-helper
 npm install
 npm start
 ```
@@ -72,7 +72,7 @@ npm start
 开发模式也可以直接运行本地服务：
 
 ```bash
-python3 codex_model_watch.py --no-open
+python3 agent_helper.py --no-open
 ```
 
 所有服务只监听 `127.0.0.1`。排程执行依赖本机的 Codex 登录态和 `codex` CLI，应用退出或电脑睡眠时不会偷偷补跑；重新启动后，未完成的执行规则会标记为“需检查”。
@@ -82,8 +82,10 @@ python3 codex_model_watch.py --no-open
 任务状态来自本机 Codex 的会话索引和 rollout 日志，排程规则保存在：
 
 ```text
-~/.codex-model-watch/state.db
+~/.agent-helper/state.db
 ```
+
+数据目录已从旧的 `~/.codex-model-watch/` 更名为 `~/.agent-helper/`，首次运行会自动迁移，无需手动处理。
 
 项目目录、Prompt 和任务标题不会上传到第三方。Helper 不提供云端队列，也不会替你把 Prompt 发给任何额外的服务；实际执行仍使用你当前登录的 Codex CLI。
 
@@ -110,13 +112,15 @@ Agent Helper 的总览、模型用量、额度窗口、容量错误和主动探�
 
 第三个标签页「玩命蹬」面向闲时免费额度场景：定义一个时间窗口（每日窗口如 00:00–08:00，支持跨午夜；或一次性窗口），排入最多 50 个任务——每个任务有独立的 Prompt，可单独编辑和排序。项目可选现有目录或新建项目（设定保存位置和文件夹名，首个任务启动时创建）。窗口开启后按设定并发执行——并行数 1 即串行，N（上限 6）为最多 N 个同时跑。窗口结束或手动停止时，在跑任务先 terminate、5 秒后强杀，剩余队列标记跳过；应用重启会自动恢复队列。
 
-ZCode 无头 CLI 缺省没有可用模型（模型选择由桌面 App 把守）。Helper 会从本机 ZCode 凭证（`~/.zcode/v2/credentials.json`）解密 coding-plan API key，生成独立的 personal provider 配置写入 `~/.codex-model-watch/zcode-provider-config.json`（0600 权限），通过 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 环境变量注入 CLI——不改动 ZCode 自身的任何文件；API key 轮换时会在执行失败后自动刷新重试。可用 `ZCODE_BIN` 环境变量指向自定义 CLI 路径。
+ZCode 无头 CLI 缺省没有可用模型（模型选择由桌面 App 把守）。Helper 会从本机 ZCode 凭证（`~/.zcode/v2/credentials.json`）解密 coding-plan API key，生成独立的 personal provider 配置写入 `~/.agent-helper/zcode-provider-config.json`（0600 权限），通过 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 环境变量注入 CLI——不改动 ZCode 自身的任何文件；API key 轮换时会在执行失败后自动刷新重试。可用 `ZCODE_BIN` 环境变量指向自定义 CLI 路径。
 
 主动探针会消耗一条很小的 Codex 请求额度，只有你主动点击时才会发出请求。历史日志无法可靠还原过去发生的模型切换，因此探针结果只代表发起探测时的状态。
 
 默认（`--agents auto`）按本机数据目录自动探测要监控的 agent；也可以用 `--agents codex` 或 `--agents codex,zcode` 显式指定。`--zcode-home` 可自定义 ZCode 主目录（默认 `~/.zcode`）。
 
 ## 已知边界
+
+- ZCode 桌面端渲染已打开的会话用的是内存运行时：任何无头排程写入的轮次都会持久化到 ZCode 数据库，但要等桌面端重新加载该会话（如重启 ZCode、或重新打开一个未驻留内存的会话）后才会显示；执行本身与历史记录不受影响。
 
 - 这是本机助手，不是云端任务队列；电脑关机、睡眠或应用退出时无法触发规则；
 - Codex rollout 和状态数据库属于本地内部格式，未来 Codex 版本变化可能需要适配；

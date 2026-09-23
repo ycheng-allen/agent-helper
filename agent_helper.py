@@ -15,7 +15,7 @@ Agent Helper —— 本地监控 Codex / ZCode 的模型使用、额度水位、
      model_usage / session 表）。本工具以只读方式增量导入，得到模型、token、时长、TTFT、
      错误类型与项目分布。任务排程通过 ZCode.app 内置的 zcode.cjs 无头 CLI 执行：
      本工具会从 ZCode 本机凭证解密 coding-plan API key，生成一份独立的 personal
-     provider 配置（~/.codex-model-watch/zcode-provider-config.json，0600）并经
+     provider 配置（~/.agent-helper/zcode-provider-config.json，0600）并经
      ZCODE_PERSONAL_PROVIDER_CONFIG_FILE 环境变量注入，使无头 CLI 具备默认模型。
      ZCode 没有实时额度接口，中断续跑采用定时重试直到恢复；探针与实时额度面板仅支持
      Codex。
@@ -45,7 +45,20 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOME = os.path.expanduser("~")
-APP_DIR = os.path.join(HOME, ".codex-model-watch")
+
+
+def _migrated_data_dir(new_name, old_name):
+    """数据目录从旧项目名一次性迁移（同盘 rename 原子生效；失败则沿用旧目录）。"""
+    new, old = os.path.join(HOME, new_name), os.path.join(HOME, old_name)
+    if not os.path.isdir(new) and os.path.isdir(old):
+        try:
+            os.rename(old, new)
+        except OSError:
+            return old
+    return new if os.path.isdir(new) else old
+
+
+APP_DIR = _migrated_data_dir(".agent-helper", ".codex-model-watch")
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 BACKEND_URL = "https://chatgpt.com/backend-api/codex/responses"
 
@@ -422,7 +435,7 @@ def run_probe(codex_home, model):
 # ---------------------------------------------------------------- 费用估算
 
 # 公开 API 牌价（每 1M tokens）。来源：openai.com/api/pricing 与 bigmodel.cn 刊例，
-# 2026-09 采集；cached 缺省按输入价 10%。可被 ~/.codex-model-watch/pricing.json 覆盖：
+# 2026-09 采集；cached 缺省按输入价 10%。可被 ~/.agent-helper/pricing.json 覆盖：
 # {"usd_cny": 7.1, "rates": {"模型前缀": {"in":x,"cached":y,"out":z,"currency":"usd|cny"}}}
 PRICING_USD_CNY = 7.1
 # 每个模型给出其有刊价市场的原生生牌价（每 1M tokens）：

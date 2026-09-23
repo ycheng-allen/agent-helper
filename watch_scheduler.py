@@ -123,7 +123,15 @@ def zcode_cmd():
 
 
 def helper_data_dir():
-    return os.path.join(os.path.expanduser("~"), ".codex-model-watch")
+    """数据目录沿用 agent_helper 的一次性迁移逻辑（新名 .agent-helper，旧名自动迁移）。"""
+    home = os.path.expanduser("~")
+    new, old = os.path.join(home, ".agent-helper"), os.path.join(home, ".codex-model-watch")
+    if not os.path.isdir(new) and os.path.isdir(old):
+        try:
+            os.rename(old, new)
+        except OSError:
+            return old
+    return new if os.path.isdir(new) else old
 
 
 def zcode_api_key(credentials_path=None):

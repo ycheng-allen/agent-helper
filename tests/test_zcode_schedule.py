@@ -230,9 +230,9 @@ class ScheduleRuleInsertColumnsTest(unittest.TestCase):
         import re
         import os
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        src = open(os.path.join(here, "codex_model_watch.py"), encoding="utf-8").read()
+        src = open(os.path.join(here, "agent_helper.py"), encoding="utf-8").read()
         inserts = re.findall(r"INSERT INTO schedule_rules\s*\((.*?)\)", src, re.S)
-        self.assertTrue(inserts, "codex_model_watch.py 中找不到 INSERT INTO schedule_rules")
+        self.assertTrue(inserts, "agent_helper.py 中找不到 INSERT INTO schedule_rules")
         for cols in inserts:
             col_list = [c.strip() for c in cols.replace("\n", " ").split(",")]
             self.assertIn("agent", col_list,

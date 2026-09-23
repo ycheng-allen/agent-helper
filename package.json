@@ -26,14 +26,14 @@
     "files": [
       "electron/**/*",
       "web/**/*",
-      "codex_model_watch.py",
+      "agent_helper.py",
       "watch_scheduler.py",
       "README*",
       "LICENSE",
       "package.json"
     ],
     "asarUnpack": [
-      "codex_model_watch.py",
+      "agent_helper.py",
       "watch_scheduler.py",
       "web/**/*",
       "electron/assets/tray-icon.png"

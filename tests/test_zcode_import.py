@@ -3,7 +3,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from codex_model_watch import api_data, db_connect, import_zcode
+from agent_helper import api_data, db_connect, import_zcode
 
 SESSION_ID = "sess_test-0000"
 TURN_MS = 1790067109494

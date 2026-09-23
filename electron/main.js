@@ -27,8 +27,8 @@ function availablePort() {
 
 function startBackend() {
   const root = app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked') : path.join(__dirname, '..');
-  const script = path.join(root, 'codex_model_watch.py');
-  backend = spawn(process.env.CODEX_MODEL_WATCH_PYTHON || '/usr/bin/python3',
+  const script = path.join(root, 'agent_helper.py');
+  backend = spawn(process.env.AGENT_HELPER_PYTHON || '/usr/bin/python3',
     [script, '--no-open', '--port', String(port)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   backend.stdout.on('data', data => console.log(`[backend] ${data}`));
   backend.stderr.on('data', data => console.error(`[backend] ${data}`));

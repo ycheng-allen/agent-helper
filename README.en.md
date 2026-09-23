@@ -36,7 +36,7 @@ Task state is scanned every five seconds. The Overview reads live quota from the
 
 ## Install on macOS Apple Silicon
 
-Download the [latest ARM64 DMG](https://github.com/Allencheng97/codex-helper/releases/latest), move Agent Helper to Applications, and open it. The current build is not signed with an Apple Developer ID; use Finder's Open action the first time.
+Download the [latest ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest), move Agent Helper to Applications, and open it. The current build is not signed with an Apple Developer ID; use Finder's Open action the first time.
 
 Build locally with:
 
@@ -55,7 +55,7 @@ Agent Helper extends that foundation with an Electron menu-bar app, task monitor
 
 ## Privacy and boundaries
 
-Agent Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.codex-model-watch/state.db`. The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
+Agent Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.agent-helper/state.db` (migrated automatically from the old `~/.codex-model-watch/`). The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
 
 This is a local helper, not a cloud queue. It cannot trigger work while the app or computer is asleep. Codex's internal rollout formats may change. The active probe uses a small request and only runs when you explicitly trigger it.
 
@@ -63,7 +63,15 @@ ZCode support covers usage statistics plus experimental scheduling. The task pic
 
 The "玩命蹬" (sprint) tab is ZCode-exclusive, built for off-peak free quota: define a time window (a daily window like 00:00–08:00, crossing midnight supported, or a one-off window) and queue up to 50 tasks, each with its own editable prompt and ordering. Pick an existing directory or create a new project (parent path + folder name, created when the first task launches). When the window opens, tasks run at the configured concurrency — 1 means serial, N (max 6) means up to N in parallel. When the window ends or you hit stop, running tasks are terminated (SIGTERM, then SIGKILL after 5s) and the remaining queue is marked skipped; queues survive app restarts.
 
-ZCode's headless CLI ships without a usable default model (model selection is guarded by the desktop app). Helper decrypts the local coding-plan API key from `~/.zcode/v2/credentials.json`, writes a standalone personal provider config to `~/.codex-model-watch/zcode-provider-config.json` (mode 0600), and injects it via `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` — ZCode's own files are never modified; rotated API keys trigger an automatic refresh and retry. Point `ZCODE_BIN` at a custom CLI to override discovery. The swap probe remains Codex-only; the quota panel works for both agents (ZCode usage comes from its account quota API). By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
+ZCode's headless CLI ships without a usable default model (model selection is guarded by the desktop app). Helper decrypts the local coding-plan API key from `~/.zcode/v2/credentials.json`, writes a standalone personal provider config to `~/.agent-helper/zcode-provider-config.json` (mode 0600), and injects it via `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` — ZCode's own files are never modified; rotated API keys trigger an automatic refresh and retry. Point `ZCODE_BIN` at a custom CLI to override discovery. The swap probe remains Codex-only; the quota panel works for both agents (ZCode usage comes from its account quota API). By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
+
+## License
+
+MIT, with attribution to the original project. See [LICENSE](LICENSE).
+
+## Known limits
+
+The ZCode desktop app renders an open conversation from its in-memory runtime, so turns submitted by any headless scheduler (including Agent Helper) are persisted to ZCode's database but only appear in the desktop UI once that session is reloaded (e.g. after restarting ZCode, or reopening a session that wasn't live). Execution itself and the persisted history are unaffected.
 
 ## License
 

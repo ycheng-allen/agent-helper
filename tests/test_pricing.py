@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from unittest.mock import patch
 
-import codex_model_watch as cmw
+import agent_helper as cmw
 
 
 class PricingTest(unittest.TestCase):
