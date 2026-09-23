@@ -93,14 +93,20 @@ Download the [latest ARM64 DMG](https://github.com/ycheng-allen/agent-helper/rel
 Download the [latest AppImage or deb](https://github.com/ycheng-allen/agent-helper/releases/latest):
 
 ```bash
-# AppImage
+# AppImage (requires libfuse2: sudo apt install libfuse2)
 chmod +x "Agent Helper-*.AppImage" && ./"Agent Helper-*.AppImage"
 
-# or deb (Ubuntu 22.04+, libappindicator3-1 needed for the tray icon)
+# or deb (Ubuntu 22.04+; tray libraries are pulled in automatically)
 sudo dpkg -i agent-helper_*_amd64.deb
 ```
 
-Requires system `python3` (preinstalled on Ubuntu) and the [ZCode desktop app for Linux](https://zcode.z.ai/cn/docs/install); ZCode installed via deb/rpm is auto-detected at `/opt/ZCode`, for the AppImage build point `ZCODE_BIN` at its bundled `zcode.cjs`. The tray works on stock Ubuntu GNOME (with the AppIndicator extension); clicking the tray icon opens a menu.
+Prerequisites:
+
+- `python3`: preinstalled on Ubuntu, runs the backend out of the box;
+- `nodejs`: only needed for ZCode scheduling/execution (credential decryption and the headless CLI both run on Node), `sudo apt install nodejs`, or point `ZCODE_NODE_BIN` at a binary; not needed when monitoring Codex only;
+- the [ZCode desktop app for Linux](https://zcode.z.ai/cn/docs/install): auto-detected at `/opt/ZCode` when installed via deb/rpm; for the AppImage build point `ZCODE_BIN` at its bundled `zcode.cjs`.
+
+The tray works on stock Ubuntu GNOME (with the AppIndicator extension); clicking the tray icon opens a menu.
 
 ### Build from source
 

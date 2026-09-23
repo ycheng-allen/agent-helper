@@ -40,7 +40,7 @@ import webbrowser
 from watch_scheduler import (Scheduler, all_task_snapshots, available_projects, ensure_zcode_provider_config,
                              helper_data_dir, init_db as init_scheduler_db, next_reset, quota_snapshot, read_quota,
                              read_zcode_quota, rule_rows, sprint_window, task_snapshots, validate_rule,
-                             validate_sprint, zcode_bin, zcode_cmd)
+                             validate_sprint, zcode_bin, zcode_cmd, zcode_runtime_diagnostics)
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -996,6 +996,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/overview":
             with g_lock:
                 self._json(api_overview(conn()))
+            return
+        if path == "/api/runtime":
+            if self.headers.get("Host", "") != "127.0.0.1:%d" % g_args.port:
+                self._json({"error": "仅允许本地面板访问"}, 403)
+                return
+            diag = zcode_runtime_diagnostics()
+            self._json({"zcode": {**diag, "ready": all(diag.values())}})
             return
         self.send_response(404)
         self.end_headers()

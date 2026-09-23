@@ -123,6 +123,17 @@ def zcode_cmd():
     return [node, path] if path.endswith(".cjs") else [path]
 
 
+def zcode_runtime_diagnostics():
+    """Read-only runtime check for the ZCode headless chain (never contains secrets)."""
+    credentials = os.path.join(os.path.expanduser("~"), ".zcode", "v2", "credentials.json")
+    return {
+        "cli": zcode_bin(),
+        "node": node_bin(),
+        "credentials": os.path.isfile(credentials),
+        "zcode_home": os.path.isdir(os.path.expanduser("~/.zcode")),
+    }
+
+
 def helper_data_dir():
     """数据目录沿用 agent_helper 的一次性迁移逻辑（新名 .agent-helper，旧名自动迁移）。
 

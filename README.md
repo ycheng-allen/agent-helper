@@ -93,14 +93,20 @@ ZCode 无头 CLI 缺省没有可用模型（模型选择由桌面 App 把守）�
 下载 [最新 AppImage 或 deb](https://github.com/ycheng-allen/agent-helper/releases/latest)：
 
 ```bash
-# AppImage
+# AppImage（需要 libfuse2：sudo apt install libfuse2）
 chmod +x "Agent Helper-*.AppImage" && ./"Agent Helper-*.AppImage"
 
-# 或 deb（Ubuntu 22.04+，需 libappindicator3-1 支持托盘）
+# 或 deb（Ubuntu 22.04+，托盘库依赖随包自动安装）
 sudo dpkg -i agent-helper_*_amd64.deb
 ```
 
-要求系统已装 `python3`（Ubuntu 自带）与 [ZCode Linux 版](https://zcode.z.ai/cn/docs/install)；ZCode 以 deb/rpm 安装到 `/opt/ZCode` 时自动识别，AppImage 安装请用 `ZCODE_BIN` 指向其内部的 `zcode.cjs`。托盘在 Ubuntu 默认 GNOME（AppIndicator 扩展）下可用，点击托盘图标弹出菜单。
+前置依赖：
+
+- `python3`：Ubuntu 自带，后端直接可用；
+- `nodejs`：仅 ZCode 排程/执行需要（凭证解密与无头 CLI 均经 Node 运行），`sudo apt install nodejs`，或用 `ZCODE_NODE_BIN` 指定路径；只监控 Codex 时不需要；
+- [ZCode Linux 版](https://zcode.z.ai/cn/docs/install)：deb/rpm 安装到 `/opt/ZCode` 时自动识别，AppImage 安装请用 `ZCODE_BIN` 指向其内部的 `zcode.cjs`。
+
+托盘在 Ubuntu 默认 GNOME（AppIndicator 扩展）下可用，点击托盘图标弹出菜单。
 
 ### 从源码构建
 

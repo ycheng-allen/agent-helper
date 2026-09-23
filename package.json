@@ -2,6 +2,8 @@
   "name": "agent-helper",
   "version": "0.5.2",
   "description": "Local Codex/ZCode usage monitor and task scheduler",
+  "homepage": "https://github.com/ycheng-allen/agent-helper",
+  "desktopName": "agent-helper",
   "author": {
     "name": "Allen Cheng",
     "email": "allenchengx@gmail.com"
@@ -11,7 +13,9 @@
     "start": "electron .",
     "dev": "electron .",
     "dist": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux --x64",
+    "dist:linux:appimage": "electron-builder --linux AppImage --x64",
+    "dist:linux:deb": "electron-builder --linux deb --x64"
   },
   "devDependencies": {
     "electron": "^38.1.0",
@@ -30,10 +34,17 @@
     },
     "linux": {
       "category": "Utility",
+      "syncDesktopName": true,
       "icon": "electron/assets/app-icon.png",
       "target": [
         "AppImage",
         "deb"
+      ]
+    },
+    "deb": {
+      "maintainer": "Allen Cheng <allenchengx@gmail.com>",
+      "depends": [
+        "libappindicator3-1 | libayatana-appindicator3-1"
       ]
     },
     "files": [

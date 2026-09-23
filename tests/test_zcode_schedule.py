@@ -113,6 +113,25 @@ class ZcodeScheduleTest(unittest.TestCase):
                               "run_at": datetime_now_iso()}, [])
         self.assertEqual("zcode", rule["agent"])
 
+    def test_zcode_api_key_reports_missing_node(self):
+        import watch_scheduler as ws
+        credentials = os.path.join(self.tmp.name, "credentials.json")
+        with open(credentials, "w") as fh:
+            fh.write("{}")
+        with patch.object(ws, "node_bin", return_value=""):
+            with self.assertRaisesRegex(RuntimeError, "node"):
+                ws.zcode_api_key(credentials_path=credentials)
+
+    def test_zcode_runtime_diagnostics(self):
+        import watch_scheduler as ws
+        with patch.object(ws, "zcode_bin", return_value="/opt/ZCode/resources/glm/zcode.cjs"), \
+             patch.object(ws, "node_bin", return_value="/usr/bin/node"):
+            diag = ws.zcode_runtime_diagnostics()
+        self.assertEqual("/opt/ZCode/resources/glm/zcode.cjs", diag["cli"])
+        self.assertEqual("/usr/bin/node", diag["node"])
+        self.assertIn("credentials", diag)
+        self.assertIn("zcode_home", diag)
+
     def test_zcode_env_wiring(self):
         from watch_scheduler import zcode_env
         with patch("watch_scheduler.ensure_zcode_provider_config",
