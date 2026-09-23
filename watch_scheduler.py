@@ -22,7 +22,7 @@ STALE_TURN_SECONDS = 7 * 86400
 ZCODE_RETRY_SECONDS = 300
 ZCODE_MAX_ATTEMPTS = 8
 ZCODE_CLI_CANDIDATES = ("/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",)
-ZCODE_PROVIDER_ID = "codex-helper-local"
+ZCODE_PROVIDER_ID = "helper-local"
 ZCODE_MODELS = ("GLM-5.3", "GLM-5.3-Flash")
 _snapshot_cache = {}
 
@@ -148,7 +148,12 @@ def ensure_zcode_provider_config(credentials_path=None, force=False):
     """Write the personal provider config that unlocks headless model turns. Returns its path."""
     out_path = os.path.join(helper_data_dir(), "zcode-provider-config.json")
     if not force and os.path.isfile(out_path):
-        return out_path
+        try:
+            with open(out_path) as fh:
+                if ZCODE_PROVIDER_ID in fh.read():
+                    return out_path
+        except OSError:
+            pass  # 缓存缺失或声明的是旧 provider id，重新生成
     key = zcode_api_key(credentials_path)
     config = {
         "schemaVersion": 1,
@@ -192,6 +197,64 @@ def zcode_env(credentials_path=None):
     if builtin and os.path.isfile(builtin):
         env["ZCODE_BUILTIN_PROVIDER_CONFIG_FILE"] = builtin
     return env, ""
+
+
+def zcode_rewrite_resume_selection(session_id, zcode_home=None):
+    """无头 resume 桌面创建的 ZCode 会话前，临时改写它的模型选择。
+
+    桌面会话把模型选择存在 session_entry(id=<sess>:runtime-model-selection)，
+    providerId 指向账号 provider（account:…），无头环境不会注册它，CLI 直接报
+    "Model creation failed"（底层 Select a model before continuing）。这里把
+    providerId 改写为注入 provider（同一个 coding-plan key、同一网关），并返回
+    原始 data 供跑完还原；无 entry、已指向注入 provider 或数据库不可写时返回
+    None（调用方无需还原）。
+    """
+    home = zcode_home or os.path.join(os.path.expanduser("~"), ".zcode")
+    path = os.path.join(home, "cli", "db", "db.sqlite")
+    entry_id = session_id + ":runtime-model-selection"
+    if not os.path.isfile(path):
+        return None
+    try:
+        conn = sqlite3.connect(path, timeout=3)
+        try:
+            row = conn.execute("SELECT data FROM session_entry WHERE id=?", (entry_id,)).fetchone()
+            if not row:
+                return None
+            original = row[0]
+            parsed = json.loads(original or "null")
+            inner = parsed.get("modelSelection") if isinstance(parsed, dict) else None
+            if not isinstance(inner, dict) or inner.get("providerId") == ZCODE_PROVIDER_ID:
+                return None
+            if inner.get("modelId") not in ZCODE_MODELS:
+                inner["modelId"] = ZCODE_MODELS[0]
+            inner["providerId"] = ZCODE_PROVIDER_ID
+            rewritten = json.dumps({"modelSelection": inner}, ensure_ascii=False)
+            conn.execute("UPDATE session_entry SET data=?, time_updated=? WHERE id=?",
+                         (rewritten, int(time.time() * 1000), entry_id))
+            conn.commit()
+            return original
+        finally:
+            conn.close()
+    except (sqlite3.Error, ValueError, OSError):
+        return None
+
+
+def zcode_restore_resume_selection(session_id, original, zcode_home=None):
+    """把 zcode_rewrite_resume_selection 改写过的模型选择还原成原值。"""
+    if original is None:
+        return
+    home = zcode_home or os.path.join(os.path.expanduser("~"), ".zcode")
+    path = os.path.join(home, "cli", "db", "db.sqlite")
+    entry_id = session_id + ":runtime-model-selection"
+    try:
+        conn = sqlite3.connect(path, timeout=3)
+        try:
+            conn.execute("UPDATE session_entry SET data=? WHERE id=?", (original, entry_id))
+            conn.commit()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        pass
 
 
 ZCODE_QUOTA_URL = "https://open.bigmodel.cn/api/monitor/usage/quota/limit"
@@ -1162,6 +1225,7 @@ class Scheduler:
             cmd = [codex_bin(), "exec", "--json", "--skip-git-repo-check", "-C", rule["cwd"], "-"]
         else:
             cmd = [codex_bin(), "exec", "resume", rule["thread_id"], "-"]
+        selection_backup = None
         try:
             if rule["kind"] == "new" and rule.get("project_mode") == "create":
                 os.mkdir(rule["cwd"])
@@ -1171,6 +1235,8 @@ class Scheduler:
                     self.conn.commit()
             if env is not None:
                 env = {**os.environ, **env}
+            if agent == "zcode" and rule["kind"] != "new":
+                selection_backup = zcode_rewrite_resume_selection(rule["thread_id"], self.zcode_home)
             proc = subprocess.run(cmd, input=None if agent == "zcode" else rule["prompt"], text=True, cwd=rule["cwd"],
                                   env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             # ZCode 侧 API key 轮换会导致签名失效（401/过期）；强制刷新配置后重试一次
@@ -1201,6 +1267,9 @@ class Scheduler:
             status = "done" if proc.returncode == 0 else "failed"
         except Exception as exc:
             output, error, status = "", str(exc), "failed"
+        finally:
+            if selection_backup is not None:
+                zcode_restore_resume_selection(rule["thread_id"], selection_backup, self.zcode_home)
         # ZCode 限流重试：失败回到等待队列按间隔重试，直到成功或次数用尽
         if (status == "failed" and agent == "zcode" and rule["kind"] == "resume"
                 and rule["trigger"] == "quota"):

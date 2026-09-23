@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from watch_scheduler import (Scheduler, all_task_snapshots, init_db, validate_rule,
+                             zcode_rewrite_resume_selection, zcode_restore_resume_selection,
                              zcode_recent_dirs, zcode_task_snapshots)
 
 SESSION_ID = "sess_11111111-2222-3333-4444-555555555555"
@@ -217,9 +218,6 @@ class ZcodeScheduleTest(unittest.TestCase):
         self.assertEqual("sess_99999999-aaaa-bbbb-cccc-dddddddddddd", row["output"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ScheduleRuleInsertColumnsTest(unittest.TestCase):
     """回归：POST /api/schedule 的 INSERT 必须写入 agent 列。
@@ -247,6 +245,55 @@ class ScheduleRuleInsertColumnsTest(unittest.TestCase):
         missing = params - set(rule)
         self.assertFalse(missing, "validate_rule 缺少 INSERT 所需参数: %s" % missing)
 
+
+
+class ZcodeResumeSelectionTest(unittest.TestCase):
+    """桌面会话的模型选择指向账号 provider，无头 resume 前需临时改写、跑完还原。"""
+
+    def _make_db(self, root, data):
+        import sqlite3, time as t
+        os.makedirs(os.path.join(root, "cli", "db"), exist_ok=True)
+        conn = sqlite3.connect(os.path.join(root, "cli", "db", "db.sqlite"))
+        conn.execute("""CREATE TABLE session_entry(
+            id text primary key, session_id text not null, type text not null,
+            time_created integer not null, time_updated integer not null, data text not null)""")
+        conn.execute("INSERT INTO session_entry VALUES(?,?,?,?,?,?)",
+                     ("sess_x:runtime-model-selection", "sess_x", "runtime/model_selection",
+                      1, 1, data))
+        conn.commit()
+        conn.close()
+
+    def test_rewrite_wrapped_account_selection(self):
+        wrapped = json.dumps({"modelSelection": {"providerId": "account:bigmodel-x",
+                                                 "modelId": "GLM-5.3-Flash",
+                                                 "options": {"reasoningLevel": "max"}}})
+        root = tempfile.mkdtemp()
+        self._make_db(root, wrapped)
+        backup = zcode_rewrite_resume_selection("sess_x", zcode_home=root)
+        self.assertEqual(wrapped, backup)
+        conn = sqlite3.connect(os.path.join(root, "cli", "db", "db.sqlite"))
+        now = conn.execute("SELECT data FROM session_entry WHERE id='sess_x:runtime-model-selection'").fetchone()[0]
+        conn.close()
+        inner = json.loads(now)["modelSelection"]
+        self.assertEqual("helper-local", inner["providerId"])   # ZCODE_PROVIDER_ID
+        self.assertEqual("GLM-5.3-Flash", inner["modelId"])     # 原模型保留
+        # 还原
+        zcode_restore_resume_selection("sess_x", backup, zcode_home=root)
+        conn = sqlite3.connect(os.path.join(root, "cli", "db", "db.sqlite"))
+        back = conn.execute("SELECT data FROM session_entry WHERE id='sess_x:runtime-model-selection'").fetchone()[0]
+        conn.close()
+        self.assertEqual(wrapped, back)
+
+    def test_noop_when_already_resolvable_or_missing(self):
+        root = tempfile.mkdtemp()
+        # 已指向注入 provider → 不改写
+        self._make_db(root, json.dumps({"modelSelection": {"providerId": "helper-local",
+                                                           "modelId": "GLM-5.3"}}))
+        self.assertIsNone(zcode_rewrite_resume_selection("sess_x", zcode_home=root))
+        # 无 entry / 无数据库 → 不改写也不报错
+        root2 = tempfile.mkdtemp()
+        self.assertIsNone(zcode_rewrite_resume_selection("sess_x", zcode_home=root2))
+        self.assertIsNone(zcode_rewrite_resume_selection("sess_x", zcode_home=os.path.join(root2, "nope")))
 
 if __name__ == "__main__":
     unittest.main()
