@@ -21,7 +21,8 @@ QUOTA_ERRORS = ("usage limit", "rate limit", "limit reached", "quota", "try agai
 STALE_TURN_SECONDS = 7 * 86400
 ZCODE_RETRY_SECONDS = 300
 ZCODE_MAX_ATTEMPTS = 8
-ZCODE_CLI_CANDIDATES = ("/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",)
+ZCODE_CLI_CANDIDATES = ("/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",  # macOS
+                       "/opt/ZCode/resources/glm/zcode.cjs")  # Linux deb/rpm 安装位置；AppImage 挂载点不定，用 ZCODE_BIN 指定
 ZCODE_PROVIDER_ID = "helper-local"
 ZCODE_MODELS = ("GLM-5.3", "GLM-5.3-Flash")
 _snapshot_cache = {}

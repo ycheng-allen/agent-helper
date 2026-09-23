@@ -88,16 +88,29 @@ ZCode's headless CLI ships without a usable default model (model selection is gu
 
 Download the [latest ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest), move Agent Helper to Applications and launch. The build is not signed with an Apple Developer ID; use Finder's right-click → Open the first time.
 
-Build from source:
+### Ubuntu / Linux x64
+
+Download the [latest AppImage or deb](https://github.com/ycheng-allen/agent-helper/releases/latest):
+
+```bash
+# AppImage
+chmod +x "Agent Helper-*.AppImage" && ./"Agent Helper-*.AppImage"
+
+# or deb (Ubuntu 22.04+, libappindicator3-1 needed for the tray icon)
+sudo dpkg -i agent-helper_*_amd64.deb
+```
+
+Requires system `python3` (preinstalled on Ubuntu) and the [ZCode desktop app for Linux](https://zcode.z.ai/cn/docs/install); ZCode installed via deb/rpm is auto-detected at `/opt/ZCode`, for the AppImage build point `ZCODE_BIN` at its bundled `zcode.cjs`. The tray works on stock Ubuntu GNOME (with the AppIndicator extension); clicking the tray icon opens a menu.
+
+### Build from source
 
 ```bash
 git clone https://github.com/ycheng-allen/agent-helper.git
 cd agent-helper
 npm install
-npm run dist
+npm run dist          # macOS: dist/Agent Helper-*.dmg
+npm run dist:linux    # Linux: dist/*.AppImage and dist/*.deb
 ```
-
-The DMG is written to `dist/Agent Helper-*.dmg`.
 
 ### Run from source directly
 

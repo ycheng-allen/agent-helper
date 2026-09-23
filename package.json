@@ -2,11 +2,16 @@
   "name": "agent-helper",
   "version": "0.5.2",
   "description": "Local Codex/ZCode usage monitor and task scheduler",
+  "author": {
+    "name": "Allen Cheng",
+    "email": "allenchengx@gmail.com"
+  },
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "dist": "electron-builder --mac"
+    "dist": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^38.1.0",
@@ -21,6 +26,14 @@
       "target": [
         "dmg",
         "zip"
+      ]
+    },
+    "linux": {
+      "category": "Utility",
+      "icon": "electron/assets/app-icon.png",
+      "target": [
+        "AppImage",
+        "deb"
       ]
     },
     "files": [

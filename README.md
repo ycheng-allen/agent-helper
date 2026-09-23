@@ -88,16 +88,29 @@ ZCode 无头 CLI 缺省没有可用模型（模型选择由桌面 App 把守）�
 
 下载 [最新 ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest)，拖入「应用程序」后启动。当前构建未经 Apple Developer ID 签名，首次打开请在 Finder 中右键选择「打开」。
 
-也可以从源码构建：
+### Ubuntu / Linux x64
+
+下载 [最新 AppImage 或 deb](https://github.com/ycheng-allen/agent-helper/releases/latest)：
+
+```bash
+# AppImage
+chmod +x "Agent Helper-*.AppImage" && ./"Agent Helper-*.AppImage"
+
+# 或 deb（Ubuntu 22.04+，需 libappindicator3-1 支持托盘）
+sudo dpkg -i agent-helper_*_amd64.deb
+```
+
+要求系统已装 `python3`（Ubuntu 自带）与 [ZCode Linux 版](https://zcode.z.ai/cn/docs/install)；ZCode 以 deb/rpm 安装到 `/opt/ZCode` 时自动识别，AppImage 安装请用 `ZCODE_BIN` 指向其内部的 `zcode.cjs`。托盘在 Ubuntu 默认 GNOME（AppIndicator 扩展）下可用，点击托盘图标弹出菜单。
+
+### 从源码构建
 
 ```bash
 git clone https://github.com/ycheng-allen/agent-helper.git
 cd agent-helper
 npm install
-npm run dist
+npm run dist          # macOS：dist/Agent Helper-*.dmg
+npm run dist:linux    # Linux：dist/*.AppImage 与 dist/*.deb
 ```
-
-生成的安装包位于 `dist/Agent Helper-*.dmg`。
 
 ### 从源码直接运行
 

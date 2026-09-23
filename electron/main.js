@@ -65,8 +65,13 @@ function showPanel() {
     panel.on('closed', () => { panel = null; });
   }
   const bounds = tray.getBounds();
-  const work = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y }).workArea;
-  const x = Math.max(work.x, Math.min(Math.round(bounds.x + bounds.width / 2 - 230), work.x + work.width - 460));
+  const anchored = bounds.x !== 0 || bounds.y !== 0;  // appindicator 下 getBounds 常返回 (0,0)
+  const work = anchored
+    ? screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y }).workArea
+    : screen.getPrimaryDisplay().workArea;
+  const x = anchored
+    ? Math.max(work.x, Math.min(Math.round(bounds.x + bounds.width / 2 - 230), work.x + work.width - 460))
+    : work.x + work.width - 470;  // 无锚点时贴屏幕右上角
   panel.setPosition(x, work.y);
   panel.show();
   panel.focus();
@@ -99,17 +104,23 @@ function createTray() {
     : path.join(__dirname, 'assets', 'tray-icon.png');
   const icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) throw new Error(`状态栏图标加载失败: ${iconPath}`);
-  icon.setTemplateImage(true);
+  if (process.platform === 'darwin') icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip('Agent Helper · 点击查看面板');
-  tray.on('click', () => panel?.isVisible() ? panel.hide() : showPanel());
-  tray.on('right-click', () => tray.popUpContextMenu(Menu.buildFromTemplate([
+  const menu = Menu.buildFromTemplate([
     { label: '打开监控面板', click: showPanel },
     { label: '打开主窗口', click: showMainWindow },
     { label: '在浏览器中打开', click: () => shell.openExternal(`http://127.0.0.1:${port}`) },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }
-  ])));
+  ]);
+  if (process.platform === 'darwin') {
+    tray.on('click', () => panel?.isVisible() ? panel.hide() : showPanel());
+    tray.on('right-click', () => tray.popUpContextMenu(menu));
+  } else {
+    // Linux appindicator/GNOME 扩展托盘的 click 事件不可靠，左键直接弹菜单
+    tray.setContextMenu(menu);
+  }
   showMainWindow();
 }
 
