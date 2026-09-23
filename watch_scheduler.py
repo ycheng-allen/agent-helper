@@ -123,15 +123,22 @@ def zcode_cmd():
 
 
 def helper_data_dir():
-    """数据目录沿用 agent_helper 的一次性迁移逻辑（新名 .agent-helper，旧名自动迁移）。"""
+    """数据目录沿用 agent_helper 的一次性迁移逻辑（新名 .agent-helper，旧名自动迁移）。
+
+    与 agent_helper._migrated_data_dir 保持同语义：两者都不存在时创建并采用新名，
+    避免一边在旧路径建库、另一边又把旧目录 rename 走（open 连接会变 readonly）。
+    """
     home = os.path.expanduser("~")
     new, old = os.path.join(home, ".agent-helper"), os.path.join(home, ".codex-model-watch")
-    if not os.path.isdir(new) and os.path.isdir(old):
-        try:
-            os.rename(old, new)
-        except OSError:
-            return old
-    return new if os.path.isdir(new) else old
+    if not os.path.isdir(new):
+        if os.path.isdir(old):
+            try:
+                os.rename(old, new)
+            except OSError:
+                return old
+        else:
+            os.makedirs(new, exist_ok=True)
+    return new
 
 
 def zcode_api_key(credentials_path=None):
@@ -265,7 +272,8 @@ def zcode_restore_resume_selection(session_id, original, zcode_home=None):
         pass
 
 
-ZCODE_QUOTA_URL = "https://open.bigmodel.cn/api/monitor/usage/quota/limit"
+# 环境变量仅用于隔离测试把额度端点指向本地假服务；生产路径不变
+ZCODE_QUOTA_URL = os.environ.get("ZCODE_QUOTA_URL") or "https://open.bigmodel.cn/api/monitor/usage/quota/limit"
 _ZCODE_UNIT_MINS = {2: 1, 3: 60, 4: 1440, 6: 10080}  # observed: 3&number=5 → 5h window, 6&number=1 → week
 
 
@@ -451,6 +459,24 @@ def quota_ready(data):
         if window and window.get("usedPercent") is not None and window["usedPercent"] >= 100:
             return False
     return True
+
+
+def zcode_retry_due(rule, now=None):
+    """ZCode 额度续跑在「额度不可读」时的固定间隔重试判定。
+
+    显式状态语义，不依赖 attempts 与 finished_at 的隐式组合：
+    - attempts == 0：首轮规则，允许直接派发；
+    - attempts > 0 且有 finished_at：距上次结束 >= ZCODE_RETRY_SECONDS 才重试；
+    - attempts > 0 但 finished_at 为空（迁移/重启遗留）：保守立即补派一次。
+    """
+    now = time.time() if now is None else now
+    attempts = rule.get("attempts") or 0
+    if attempts <= 0:
+        return True
+    finished_at = rule.get("finished_at")
+    if finished_at is None:
+        return True
+    return now - finished_at >= ZCODE_RETRY_SECONDS
 
 
 def next_reset(data):
@@ -945,13 +971,11 @@ class Scheduler:
                     err_ok = turn.get("status") == "failed" and any(
                         x in (turn.get("error", "") or "").replace("_", " ").lower() for x in QUOTA_ERRORS)
                     if (rule.get("agent") or "codex") == "zcode":
-                        # ZCode 续跑：优先用实时额度窗口判断；额度未知时退回固定间隔重试
+                        # ZCode 续跑：优先用实时额度窗口判断；额度不可读时退回固定间隔重试
                         if self.zcode_quota:
                             due = err_ok and quota_ready(self.zcode_quota)
                         else:
-                            attempts = rule.get("attempts") or 0
-                            wait_ok = attempts == 0 or time.time() - (rule["finished_at"] or 0) >= ZCODE_RETRY_SECONDS
-                            due = err_ok and wait_ok
+                            due = err_ok and zcode_retry_due(rule)
                     else:
                         due = err_ok and quota_ready(self.quota or {})
                 else:

@@ -48,14 +48,22 @@ HOME = os.path.expanduser("~")
 
 
 def _migrated_data_dir(new_name, old_name):
-    """数据目录从旧项目名一次性迁移（同盘 rename 原子生效；失败则沿用旧目录）。"""
+    """数据目录从旧项目名一次性迁移（同盘 rename 原子生效；失败则沿用旧目录）。
+
+    两者都不存在（全新安装/目录被清）时必须创建并采用新名：若回退旧名，
+    conn() 会在旧路径建库，随后 helper_data_dir 又把旧目录 rename 成新目录，
+    已打开的 sqlite 连接因 journal 无法在原路径创建而报 readonly database。
+    """
     new, old = os.path.join(HOME, new_name), os.path.join(HOME, old_name)
-    if not os.path.isdir(new) and os.path.isdir(old):
-        try:
-            os.rename(old, new)
-        except OSError:
-            return old
-    return new if os.path.isdir(new) else old
+    if not os.path.isdir(new):
+        if os.path.isdir(old):
+            try:
+                os.rename(old, new)
+            except OSError:
+                return old
+        else:
+            os.makedirs(new, exist_ok=True)
+    return new
 
 
 APP_DIR = _migrated_data_dir(".agent-helper", ".codex-model-watch")

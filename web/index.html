@@ -192,19 +192,19 @@
 <div class="wrap">
   <div class="topbar">
     <div class="logo"><b>AGENT HELPER</b><span data-i18n="subtitle">额度监控与任务排程</span></div>
-    <div class="switcher" role="tablist" aria-label="选择空间">
-      <button class="switch-btn c-all" id="spaceAll" role="tab" aria-selected="false" onclick="switchAgent('all')">总览</button>
+    <div class="switcher" role="tablist" aria-label="选择空间" data-i18n-aria="spacePicker">
+      <button class="switch-btn c-all" id="spaceAll" role="tab" aria-selected="false" onclick="switchAgent('all')" data-i18n="spaceAll">总览</button>
       <button class="switch-btn c-codex" id="agentCodex" role="tab" aria-selected="true" onclick="switchAgent('codex')">Codex<span class="switch-count" id="codexCount" hidden></span></button>
       <button class="switch-btn c-zcode" id="agentZcode" role="tab" aria-selected="false" onclick="switchAgent('zcode')">ZCode<span class="switch-count" id="zcodeCount" hidden></span></button>
     </div>
     <div class="right">
-      <button class="iconbtn" id="langBtn" title="EN / 中文" onclick="setLang(LANG==='en'?'ch':'en')" style="font-size:11px;width:auto;padding:0 8px">EN</button>
-      <span id="gen">加载中…</span>
-      <button class="iconbtn" title="刷新当前页面" aria-label="刷新当前页面" onclick="refreshCurrentTab()">⟳</button>
+      <button class="iconbtn" id="langBtn" title="EN / 中文" data-i18n-title="langBtnTitle" onclick="setLang(LANG==='en'?'ch':'en')" style="font-size:11px;width:auto;padding:0 8px">EN</button>
+      <span id="gen" data-i18n="loading">加载中…</span>
+      <button class="iconbtn" title="刷新当前页面" data-i18n-title="refresh" aria-label="刷新当前页面" data-i18n-aria="refresh" onclick="refreshCurrentTab()">⟳</button>
     </div>
   </div>
   <div id="demoBanner" data-i18n="demoBanner">演示数据模式（--demo），并非真实使用记录</div>
-  <nav class="tabs" role="tablist" aria-label="主导航" onkeydown="handleTabKey(event)">
+  <nav class="tabs" role="tablist" aria-label="主导航" data-i18n-aria="mainNav" onkeydown="handleTabKey(event)">
     <button class="tab" id="tab-stats" role="tab" aria-controls="view-stats" aria-selected="false" onclick="setTab('stats')"><span data-i18n="stats">统计总览</span></button>
     <button class="tab" id="tab-overview" role="tab" aria-controls="view-overview" aria-selected="true" onclick="setTab('overview')"><span data-i18n="overview">监控总览</span></button>
     <button class="tab" id="tab-schedule" role="tab" aria-controls="view-schedule" aria-selected="false" onclick="setTab('schedule')"><span data-i18n="schedule">任务排程</span> <span class="tab-count" id="sTabCount" hidden></span></button>
@@ -228,7 +228,7 @@
 
   <div class="panel"><h2 data-i18n="modelDetail">本月模型费用明细</h2><div style="overflow-x:auto"><table id="tStatModels"></table></div></div>
 
-  <div class="foot">费用为公开 API 牌价折算（汇率可在 ~/.agent-helper/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
+  <div class="foot" data-i18n="costNote">费用为公开 API 牌价折算（汇率可在 ~/.agent-helper/pricing.json 调整），非实际账单；每日趋势取最近 30 天。</div>
   </section>
 
   <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
@@ -298,7 +298,7 @@
         <div class="schedule-panel" id="sAutoPanel">
           <label class="auto-row" for="sAuto"><span class="auto-copy"><b data-i18n="autoResume">额度恢复后自动续跑</b>
             <small data-i18n="autoResumeSub">开启后监控正在运行的任务。若随后因额度耗尽中断，额度恢复便继续。</small></span>
-            <input type="checkbox" class="switch" id="sAuto" onchange="setAutoResume()" aria-label="额度恢复后自动续跑"></label>
+            <input type="checkbox" class="switch" id="sAuto" onchange="setAutoResume()" aria-label="额度恢复后自动续跑" data-i18n-aria="autoResume"></label>
         </div>
         <div class="schedule-panel" id="zSchedNote" hidden>
           <span class="auto-copy"><b data-i18n="zResume">ZCode 续跑说明</b>
@@ -306,36 +306,36 @@
         </div>
         <form class="schedule-panel" id="sForm" onsubmit="event.preventDefault();addSchedule()">
           <h2 data-i18n="newRuleH">创建一次性规则</h2><p class="sub" data-i18n="newRuleSub">选择要做的事，填写触发条件和指令。</p>
-          <div class="kind-options" role="group" aria-label="任务动作">
+          <div class="kind-options" role="group" aria-label="任务动作" data-i18n-aria="kindAction">
             <button type="button" class="kind-option active" data-kind="new" onclick="chooseKind('new')" data-i18n="startNew">启动新任务</button>
             <button type="button" class="kind-option" data-kind="next" onclick="chooseKind('next')" data-i18n="sendNext">发送下一步</button>
             <button type="button" class="kind-option" data-kind="resume" onclick="chooseKind('resume')" data-i18n="resumeTask">续跑任务</button>
           </div>
           <input type="hidden" id="sKind" value="new">
           <div class="schedule-grid">
-            <label class="schedule-field wide" id="sTriggerBox">何时运行<select id="sTrigger" onchange="scheduleFields()">
+            <label class="schedule-field wide" id="sTriggerBox"><span data-i18n="whenRun">何时运行</span><select id="sTrigger" onchange="scheduleFields()">
               <option value="at" data-i18n="optAt">指定时间</option><option value="quota" id="optQuota" data-i18n="optQuota">下一次额度刷新后</option><option value="after" data-i18n="optAfter">另一任务完成后</option></select></label>
             <div class="schedule-field wide" id="sTaskBox" hidden>
-              <label class="schedule-field">项目<select id="sTaskProject" onchange="updateTaskOptions()"></select></label>
-              <label class="schedule-field" style="margin-top:10px">具体任务（对话）<select id="sTask" onchange="updateTaskNote()"></select></label>
-              <span class="field-note" id="sTaskNote">先选项目，再选具体任务。</span>
+              <label class="schedule-field"><span data-i18n="projLabel">项目</span><select id="sTaskProject" onchange="updateTaskOptions()"></select></label>
+              <label class="schedule-field" style="margin-top:10px"><span data-i18n="taskConv">具体任务（对话）</span><select id="sTask" onchange="updateTaskNote()"></select></label>
+              <span class="field-note" id="sTaskNote" data-i18n="notePick">先选项目，再选具体任务。</span>
             </div>
-            <label class="schedule-field wide" id="sTimeBox">执行时间<input type="datetime-local" id="sTime"></label>
-            <div class="schedule-field wide" id="sProjectModeBox">任务所属项目
-              <div class="project-options" role="group" aria-label="项目来源">
+            <label class="schedule-field wide" id="sTimeBox"><span data-i18n="runAt">执行时间</span><input type="datetime-local" id="sTime"></label>
+            <div class="schedule-field wide" id="sProjectModeBox"><span data-i18n="projOf">任务所属项目</span>
+              <div class="project-options" role="group" aria-label="项目来源" data-i18n-aria="projOf">
                 <button type="button" class="kind-option active" data-project-mode="existing" onclick="chooseProjectMode('existing')" data-i18n="pickExisting">选择现有项目</button>
                 <button type="button" class="kind-option" data-project-mode="create" onclick="chooseProjectMode('create')" data-i18n="createNewProj">创建新项目</button>
               </div><input type="hidden" id="sProjectMode" value="existing"></div>
-            <label class="schedule-field wide" id="sExistingProjectBox">已保存的本地项目<select id="sProject"></select>
-              <span class="field-note">从 Codex 项目列表与 ZCode 最近会话目录读取。</span></label>
+            <label class="schedule-field wide" id="sExistingProjectBox"><span data-i18n="existingLocalProj">已保存的本地项目</span><select id="sProject"></select>
+              <span class="field-note" data-i18n="savedProjNote">从 Codex 项目列表与 ZCode 最近会话目录读取。</span></label>
             <div class="schedule-field wide" id="sNewProjectBox" hidden>
               <label class="schedule-field"><span data-i18n="newProjName">新项目名称</span><input id="sProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
               <label class="schedule-field" style="margin-top:10px"><span data-i18n="saveTo">保存到哪个文件夹</span><input id="sProjectParent" list="sProjectParents" placeholder="/Users/you/Documents" autocomplete="off"></label>
               <datalist id="sProjectParents"></datalist>
-              <span class="field-note">规则触发时创建新目录，并在其中启动任务。</span>
+              <span class="field-note" data-i18n="mkdirNote">规则触发时创建新目录，并在其中启动任务。</span>
             </div>
-            <label class="schedule-field wide"><span id="sPromptLabel">任务指令</span><textarea id="sPrompt" data-i18n-ph="sPromptPh" placeholder="描述希望 Codex 完成的工作"></textarea>
-              <span class="field-note" id="sPromptNote">保存后只执行一次；应用需保持运行。</span></label>
+            <label class="schedule-field wide"><span id="sPromptLabel">任务指令</span><textarea id="sPrompt" data-i18n-ph="phNew" placeholder="描述希望 Codex 完成的工作"></textarea>
+              <span class="field-note" id="sPromptNote" data-i18n="onceNote">保存后只执行一次；应用需保持运行。</span></label>
           </div>
           <div class="schedule-form-actions"><button type="submit" class="primary-action" id="sSave" data-i18n="saveRule">保存规则</button>
             <span class="hint" data-i18n="localNote">本地保存 · 可在执行前取消</span></div>
@@ -344,7 +344,7 @@
       </div>
       <div class="schedule-panel">
         <h2 data-i18n="queue">Schedule 队列</h2><p class="sub" data-i18n="queueSub">等待中的规则按计划时间展示；触发条件满足后开始执行。</p>
-        <div class="schedule-filter" id="sFilters" role="group" aria-label="筛选排程规则">
+        <div class="schedule-filter" id="sFilters" role="group" aria-label="筛选排程规则" data-i18n-aria="ruleFilterAria">
           <button type="button" class="active" data-filter="active" onclick="setRuleFilter('active')" data-i18n="fActive">进行中</button>
           <button type="button" data-filter="history" onclick="setRuleFilter('history')" data-i18n="fHistory">历史</button>
           <button type="button" data-filter="all" onclick="setRuleFilter('all')" data-i18n="fAll">全部</button>
@@ -353,61 +353,61 @@
         <div id="sList" class="schedule-list"></div>
       </div>
     </div>
-    <div class="foot">每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度；ZCode 任务中断后每 5 分钟自动重试（最多 8 次）。电脑睡眠期间不会触发，唤醒后继续检查。</div>
+    <div class="foot" data-i18n="schedFoot">每 5 秒检查本机任务；等待额度时约每 10 秒读取 Codex 实时额度；ZCode 任务中断后每 5 分钟自动重试（最多 8 次）。电脑睡眠期间不会触发，唤醒后继续检查。</div>
   </section>
 
   <section id="view-sprint" role="tabpanel" aria-labelledby="tab-sprint" hidden>
-    <div class="schedule-head"><div><h1 data-i18n="sprintHead">免费玩命蹬</h1><p>ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。</p></div>
-      <div class="schedule-summary" id="spSummary"><button type="button" class="primary-action" id="spStopAll" onclick="stopAllSprints()" hidden style="background:var(--fail);border-color:var(--fail)">中止全部</button></div></div>
+    <div class="schedule-head"><div><h1 data-i18n="sprintHead">免费玩命蹬</h1><p data-i18n="sprintSub">ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。</p></div>
+      <div class="schedule-summary" id="spSummary"><button type="button" class="primary-action" id="spStopAll" onclick="stopAllSprints()" hidden style="background:var(--fail);border-color:var(--fail)" data-i18n="stopAll">中止全部</button></div></div>
     <div class="schedule-layout">
       <div>
         <form class="schedule-panel" id="spForm" onsubmit="event.preventDefault();createSprint()">
           <h2 data-i18n="newWindowH">创建窗口</h2><p class="sub" data-i18n="newWindowSub">队列在窗口开启后自动逐个（或并行）执行，窗口结束强制收工。</p>
           <div class="schedule-grid">
             <label class="schedule-field wide" style="flex-direction:row;gap:14px;align-items:center">
-              <span style="flex:none">窗口类型</span>
-              <span class="project-options" style="margin:0;flex:1" role="group" aria-label="窗口类型">
-                <button type="button" class="kind-option active" data-sp-kind="daily" onclick="chooseSprintKind('daily')">每日窗口</button>
-                <button type="button" class="kind-option" data-sp-kind="once" onclick="chooseSprintKind('once')">一次性</button>
+              <span style="flex:none" data-i18n="winType">窗口类型</span>
+              <span class="project-options" style="margin:0;flex:1" role="group" aria-label="窗口类型" data-i18n-aria="winType">
+                <button type="button" class="kind-option active" data-sp-kind="daily" onclick="chooseSprintKind('daily')" data-i18n="dailyW">每日窗口</button>
+                <button type="button" class="kind-option" data-sp-kind="once" onclick="chooseSprintKind('once')" data-i18n="onceW">一次性</button>
               </span><input type="hidden" id="spKind" value="daily"></label>
             <div class="schedule-field wide" id="spDailyBox">
               <div style="display:flex;gap:10px">
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">每日开始<input type="time" id="spStartHm" value="00:00"></label>
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">每日结束<input type="time" id="spEndHm" value="08:00"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="dStart">每日开始</span><input type="time" id="spStartHm" value="00:00"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="dEnd">每日结束</span><input type="time" id="spEndHm" value="08:00"></label>
               </div>
-              <span class="field-note">支持跨午夜（如 22:00 → 06:00）。按本机时区。</span>
+              <span class="field-note" data-i18n="crossNote">支持跨午夜（如 22:00 → 06:00）。按本机时区。</span>
             </div>
             <div class="schedule-field wide" id="spOnceBox" hidden>
               <div style="display:flex;gap:10px">
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">开始时间<input type="datetime-local" id="spStartAt"></label>
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">结束时间<input type="datetime-local" id="spEndAt"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="sAt">开始时间</span><input type="datetime-local" id="spStartAt"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="eAt">结束时间</span><input type="datetime-local" id="spEndAt"></label>
               </div>
             </div>
-            <label class="schedule-field">并行数<input type="number" id="spConcurrency" min="1" max="6" value="1">
-              <span class="field-note">1 = 串行；N = 最多 N 个同时跑（上限 6）。</span></label>
-            <div class="schedule-field" id="spProjectModeBox">任务项目
-              <div class="project-options" role="group" aria-label="项目来源">
-                <button type="button" class="kind-option active" data-sp-mode="existing" onclick="chooseSprintProjectMode('existing')">现有目录</button>
-                <button type="button" class="kind-option" data-sp-mode="create" onclick="chooseSprintProjectMode('create')">新建项目</button>
+            <label class="schedule-field"><span data-i18n="parN">并行数</span><input type="number" id="spConcurrency" min="1" max="6" value="1">
+              <span class="field-note" data-i18n="parNote">1 = 串行；N = 最多 N 个同时跑（上限 6）。</span></label>
+            <div class="schedule-field" id="spProjectModeBox"><span data-i18n="taskProj">任务项目</span>
+              <div class="project-options" role="group" aria-label="项目来源" data-i18n-aria="projOf">
+                <button type="button" class="kind-option active" data-sp-mode="existing" onclick="chooseSprintProjectMode('existing')" data-i18n="existDir">现有目录</button>
+                <button type="button" class="kind-option" data-sp-mode="create" onclick="chooseSprintProjectMode('create')" data-i18n="newProjDir">新建项目</button>
               </div><input type="hidden" id="spProjectMode" value="existing"></div>
-            <label class="schedule-field wide" id="spExistingBox">现有目录<select id="spProject"></select>
-              <span class="field-note">队列中所有任务都在此目录执行。</span></label>
+            <label class="schedule-field wide" id="spExistingBox"><span data-i18n="existDir">现有目录</span><select id="spProject"></select>
+              <span class="field-note" data-i18n="dirNote">队列中所有任务都在此目录执行。</span></label>
             <div class="schedule-field wide" id="spNewBox" hidden>
               <div style="display:flex;gap:10px">
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">新文件夹名称<input id="spProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
-                <label style="flex:1;display:flex;flex-direction:column;gap:5px">保存位置<input id="spProjectParent" list="spParents" placeholder="例如 /Users/你/Projects" autocomplete="off"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="folderName">新文件夹名称</span><input id="spProjectName" placeholder="例如 my-new-project" autocomplete="off"></label>
+                <label style="flex:1;display:flex;flex-direction:column;gap:5px"><span data-i18n="saveLoc">保存位置</span><input id="spProjectParent" list="spParents" placeholder="例如 /Users/你/Projects" autocomplete="off"></label>
               </div>
               <datalist id="spParents"></datalist>
-              <span class="field-note">窗口首个任务启动时创建目录并登记为本地项目。</span>
+              <span class="field-note" data-i18n="lazyNote">窗口首个任务启动时创建目录并登记为本地项目。</span>
             </div>
-            <div class="schedule-field wide">任务队列
+            <div class="schedule-field wide"><span data-i18n="sprintQueue">任务队列</span>
               <div id="spTaskList"></div>
-              <button type="button" class="sp-addtask" onclick="addSprintTask()">＋ 添加任务</button>
-              <span class="field-note">每个任务有独立的 Prompt，按顺序执行（并行时按序占用空槽）；最多 50 个。</span>
+              <button type="button" class="sp-addtask" onclick="addSprintTask()" data-i18n="addTask">＋ 添加任务</button>
+              <span class="field-note" data-i18n="taskNote">每个任务有独立的 Prompt，按顺序执行（并行时按序占用空槽）；最多 50 个。</span>
             </div>
           </div>
           <div class="schedule-form-actions"><button type="submit" class="primary-action" id="spSave" data-i18n="newWindowH">创建窗口</button>
-            <span class="hint">到点自动停止全部任务 · 可随时手动停止</span></div>
+            <span class="hint" data-i18n="autostopNote">到点自动停止全部任务 · 可随时手动停止</span></div>
           <div id="spMessage" class="schedule-message" role="status" aria-live="polite"></div>
         </form>
       </div>
@@ -416,7 +416,7 @@
         <div id="spList" class="schedule-list"></div>
       </div>
     </div>
-    <div class="foot">每 5 秒检查一次窗口与队列；窗口结束时先 terminate、5 秒后强杀残留进程。电脑睡眠期间窗口照常按墙钟判定。</div>
+    <div class="foot" data-i18n="sprintFoot">每 5 秒检查一次窗口与队列；窗口结束时先 terminate、5 秒后强杀残留进程。电脑睡眠期间窗口照常按墙钟判定。</div>
   </section>
 </div>
 
@@ -665,6 +665,23 @@ const I18N={
   created:{ch:'已创建',en:'Created'}, tasksQueued:{ch:'个任务入队',en:'tasks queued'},
   confirmDelSprint:{ch:'确定删除该窗口及其队列？',en:'Delete this window and its queue?'},
   min:{ch:'分',en:'m'}, unknownModel:{ch:'?',en:'?'},
+  // chrome（顶栏 / 无障碍）
+  spaceAll:{ch:'总览',en:'Overview'},
+  spacePicker:{ch:'选择空间',en:'Space'},
+  mainNav:{ch:'主导航',en:'Main navigation'},
+  langBtnTitle:{ch:'切换语言',en:'Switch language'},
+  refresh:{ch:'刷新当前页面',en:'Refresh this page'},
+  // schedule 表单补充
+  projLabel:{ch:'项目',en:'Project'},
+  existingLocalProj:{ch:'已保存的本地项目',en:'Saved local projects'},
+  kindAction:{ch:'任务动作',en:'Task action'},
+  ruleFilterAria:{ch:'筛选排程规则',en:'Filter schedule rules'},
+  // sprint 补充
+  sprintSub:{ch:'ZCode 专属：在设定的时间窗口内跑完一个任务队列，到点自动停止所有在跑任务；也可随时手动开始（可选并行数）。并行数 1 即串行。',
+             en:'ZCode only: run a task queue inside a time window; everything stops at the end. You can also start manually with optional parallelism (1 = serial).'},
+  upTitle:{ch:'上移',en:'Move up'}, downTitle:{ch:'下移',en:'Move down'}, delTitle:{ch:'删除',en:'Delete'},
+  delTaskTitle:{ch:'删除该任务',en:'Remove this task'},
+  runningNowA:{ch:'▸ 正在跑 ',en:'▸ Running '}, runningNowB:{ch:' 个：',en:' task(s): '},
 };
 function t(key){const e=I18N[key];return e?(LANG==='en'?e.en:e.ch):key;}
 function setLang(lang){
@@ -678,6 +695,8 @@ function setLang(lang){
 function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n);});
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{el.placeholder=t(el.dataset.i18nPh);});
+  document.querySelectorAll('[data-i18n-aria]').forEach(el=>{el.setAttribute('aria-label',t(el.dataset.i18nAria));});
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{el.title=t(el.dataset.i18nTitle);});
   const btn=document.getElementById('langBtn');
   if(btn)btn.textContent=LANG==='en'?'中文':'EN';
   const st=document.getElementById('statBtns');
@@ -729,7 +748,7 @@ function renderQuota(quota,agent='codex'){
       `<span class="hint">${valid?t('usedPct')+' '+Math.round(Number(value))+'% · ':''}${reset(window)}</span></div>`;
   };
   const sample=new Date(live?live.sampled_at*1000:logged.ts);
-  const stamp=Number.isNaN(sample.getTime())?'未知':sample.toLocaleString('zh-CN',{hour12:false});
+  const stamp=Number.isNaN(sample.getTime())?t('unknown'):sample.toLocaleString(LANG==='en'?'en-US':'zh-CN',{hour12:false});
   const source=live?(agent==='zcode'?t('srcLiveZcode'):t('srcLiveCodex'))
     :(agent==='zcode'?t('srcWait'):t('srcLog'));
   const labels=agent==='zcode'?['5h',LANG==='en'?'wk':'周']:['5h','7d'];
@@ -1027,7 +1046,7 @@ function taskProjectKey(task){return task.project_id||task.project_path||task.cw
 function updateTaskOptions(){
   const tasks=eligibleTasks();
   const projects=new Map();
-  tasks.forEach(t=>{const key=taskProjectKey(t);if(!projects.has(key))projects.set(key,t.project_name||t('unclassified'));});
+  tasks.forEach(task=>{const key=taskProjectKey(task);if(!projects.has(key))projects.set(key,task.project_name||t('unclassified'));});
   const projectSelect=$('#sTaskProject'),previousProject=projectSelect.value;
   projectSelect.innerHTML='<option value="">'+(projects.size?t('pickProj'):t('noProjAvail'))+'</option>'+
     [...projects].sort((a,b)=>a[1].localeCompare(b[1],'zh')).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
@@ -1035,8 +1054,8 @@ function updateTaskOptions(){
   const projectKey=projectSelect.value;
   const shown=tasks.filter(t=>taskProjectKey(t)===projectKey);
   const chosen=$('#sTask').value;
-  $('#sTask').innerHTML='<option value="">'+(projectKey?t('pickTask'):t('pickFirst'))+'</option>'+shown.map(t=>
-    `<option value="${esc(t.id)}">${esc((t.title||t('taskPrefix')+' '+t.id.slice(0,8)).slice(0,64))} · #${esc(t.id.slice(0,8))} · ${t.agent==='zcode'?'ZCode':'Codex'} · ${esc(tsLabel((t.turn||{}).status))}</option>`).join('');
+  $('#sTask').innerHTML='<option value="">'+(projectKey?t('pickTask'):t('pickFirst'))+'</option>'+shown.map(task=>
+    `<option value="${esc(task.id)}">${esc((task.title||t('taskPrefix')+' '+task.id.slice(0,8)).slice(0,64))} · #${esc(task.id.slice(0,8))} · ${task.agent==='zcode'?'ZCode':'Codex'} · ${esc(tsLabel((task.turn||{}).status))}</option>`).join('');
   if(shown.some(t=>t.id===chosen))$('#sTask').value=chosen;
   updateTaskNote();
 }
@@ -1096,7 +1115,7 @@ function filterScheduleData(d,agent){
           projects:d.projects||[],auto_resume:d.auto_resume,quota_error:d.quota_error};
 }
 async function loadSchedule(){
-  try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error('读取失败');
+  try{const response=await fetch('/api/schedule');if(!response.ok)throw new Error(t('readFailShort'));
     scheduleData=filterScheduleData(await response.json(),curAgent);}
   catch(e){$('#sQuotaError').hidden=false;$('#sQuotaError').textContent=t('queueFail');return;}
   $('#sAuto').checked=!!scheduleData.auto_resume;
@@ -1136,7 +1155,7 @@ async function addSchedule(){
     const result=await response.json();if(!response.ok)throw new Error(result.error||t('saveFailed'));
     $('#sPrompt').value='';scheduleMessage(result.rule?.trigger==='immediate'?t('startedNow'):t('queued'),'success');setRuleFilter('active');await loadSchedule();
   }catch(e){scheduleMessage(String(e.message||e),'error');}
-  finally{button.disabled=false;button.textContent='保存规则';}
+  finally{button.disabled=false;button.textContent=t('saveRule');}
 }
 async function cancelSchedule(id){
   try{const response=await fetch('/api/schedule/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
@@ -1247,9 +1266,9 @@ function addSprintTask(prompt=''){
   row.innerHTML=`<span class="idx"></span>
     <textarea placeholder="${escAttr(t("spTaskPh"))}">${promptEsc}</textarea>
     <span class="ops">
-      <button type="button" title="上移" onclick="moveSprintTask(this,-1)">↑</button>
-      <button type="button" title="下移" onclick="moveSprintTask(this,1)">↓</button>
-      <button type="button" class="del" title="删除" onclick="removeSprintTask(this)">✕</button>
+      <button type="button" title="${escAttr(t('upTitle'))}" onclick="moveSprintTask(this,-1)">↑</button>
+      <button type="button" title="${escAttr(t('downTitle'))}" onclick="moveSprintTask(this,1)">↓</button>
+      <button type="button" class="del" title="${escAttr(t('delTitle'))}" onclick="removeSprintTask(this)">✕</button>
     </span>`;
   list.appendChild(row);
   renumberSprintTasks();
@@ -1325,28 +1344,29 @@ function renderSprints(){
     const finished=cnt.done+cnt.failed+cnt.stopped+cnt.skipped;
     const pct=Math.round(finished*100/total);
     const state=sprintStateText(s);
-    const cls=s.status==='stopped'?'b-bad':s.status==='done'?'b-ok':state==='进行中'?'b-warn':'b-off';
-    const winText=s.kind==='daily'?`每日 ${s.start_hm} → ${s.end_hm}`:
-      s.window?`${new Date(s.window[0]*1000).toLocaleString('zh-CN',{hour12:false})} → ${new Date(s.window[1]*1000).toLocaleTimeString('zh-CN',{hour12:false})}`:'';
+    const cls=s.status==='stopped'?'b-bad':s.status==='done'?'b-ok':s.status==='running'?'b-warn':'b-off';
+    const locale=LANG==='en'?'en-US':'zh-CN';
+    const winText=s.kind==='daily'?`${t('dailyW2')} ${s.start_hm} → ${s.end_hm}`:
+      s.window?`${new Date(s.window[0]*1000).toLocaleString(locale,{hour12:false})} → ${new Date(s.window[1]*1000).toLocaleTimeString(locale,{hour12:false})}`:'';
     const isActive=s.status==='waiting'||s.status==='running';
     const runningNow=tasks.filter(t=>t.status==='running');
     const pending=tasks.filter(t=>t.status==='pending');
-    const pendingRows=pending.length?pending.map((t,i)=>
-      `<div class="sp-qrow" draggable="true" data-tid="${esc(t.id)}" ondragstart="spDragStart(event,'${esc(t.id)}')" ondragover="event.preventDefault()" ondrop="spDrop(event,'${esc(s.id)}','${esc(t.id)}')">
-        <span class="idx">${i+1}</span><span class="sp-qprompt" title="${esc(t.prompt)}">${esc((t.prompt||'').slice(0,60))}</span>
-        <span class="ops"><button type="button" title="删除该任务" onclick="deleteSprintTask('${esc(s.id)}','${esc(t.id)}')">✕</button></span>
+    const pendingRows=pending.length?pending.map((task,i)=>
+      `<div class="sp-qrow" draggable="true" data-tid="${esc(task.id)}" ondragstart="spDragStart(event,'${esc(task.id)}')" ondragover="event.preventDefault()" ondrop="spDrop(event,'${esc(s.id)}','${esc(task.id)}')">
+        <span class="idx">${i+1}</span><span class="sp-qprompt" title="${esc(task.prompt)}">${esc((task.prompt||'').slice(0,60))}</span>
+        <span class="ops"><button type="button" title="${escAttr(t('delTaskTitle'))}" onclick="deleteSprintTask('${esc(s.id)}','${esc(task.id)}')">✕</button></span>
       </div>`).join('')
       :`<div class="hint" style="margin:4px 0">${t('queueEmpty')}</div>`;
     return `<article class="schedule-item"><div class="schedule-item-head"><span class="badge ${cls}">${esc(state)}</span>
       <b>${esc(s.name)}</b><span class="hint">${s.concurrency>1?t('parallel')+' '+s.concurrency:t('serial')} · ${finished} / ${tasks.length} ${t('finishedN')}</span>
-      ${s.status==='waiting'?`<span class="hint">并行</span><input type="number" min="1" max="6" value="${s.concurrency}" id="spcc-${esc(s.id)}" style="width:52px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);border-radius:6px;padding:2px 6px;font-size:11px">
+      ${s.status==='waiting'?`<span class="hint">${t('parallel')}</span><input type="number" min="1" max="6" value="${s.concurrency}" id="spcc-${esc(s.id)}" style="width:52px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);border-radius:6px;padding:2px 6px;font-size:11px">
         <button type="button" class="primary-action" style="padding:3px 12px;font-size:11px" onclick="startSprint('${esc(s.id)}')">${t('start')}</button>
         <button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}
       ${isActive?`<button type="button" onclick="stopSprint('${esc(s.id)}')">${t('stop')}</button>`:''}
       ${!isActive?`<button type="button" class="hint" style="border:1px solid var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;background:transparent" onclick="deleteSprint('${esc(s.id)}')">${t('del')}</button>`:''}</div>
       <div class="meta">${esc(winText)} · ${esc(s.cwd)}${s.manual?' · '+t('manualStart'):''}</div>
       ${s.status==='running'?`<div class="qbar" style="margin-top:8px"><span class="track" style="flex:1"><span class="fill" style="width:${pct}%;background:var(--accent)"></span></span><span class="pct">${pct}%</span></div>`:''}
-      ${runningNow.length?`<div class="meta" style="color:var(--warn)">▸ 正在跑 ${runningNow.length} 个：${esc(runningNow.map(t=>(t.prompt||'').slice(0,30)).join(' ｜ '))}</div>`:''}
+      ${runningNow.length?`<div class="meta" style="color:var(--warn)">${t('runningNowA')}${runningNow.length}${t('runningNowB')}${esc(runningNow.map(t=>(t.prompt||'').slice(0,30)).join(' ｜ '))}</div>`:''}
       ${pending.length&&isActive?`<div style="margin-top:8px"><div class="hint" style="margin-bottom:3px">${t('pendingQueue')}</div><div id="spq-${esc(s.id)}">${pendingRows}</div></div>`:''}
       ${cnt.skipped||cnt.stopped?`<div class="meta">${t('skippedN')} ${cnt.skipped} · ${t('stoppedN')} ${cnt.stopped} · ${t('stFailed')} ${cnt.failed} · ${t('finishedN')} ${cnt.done}</div>`:''}
       ${s.error?`<div class="meta" style="color:var(--fail)">${esc(s.error)}</div>`:''}
@@ -1439,7 +1459,7 @@ async function createSprint(){
     }
     else sprintMessage(r.error,'error');
   }catch(e){sprintMessage(String(e.message||e),'error');}
-  finally{btn.disabled=false;btn.textContent='创建窗口';}
+  finally{btn.disabled=false;btn.textContent=t('newWindowH');}
 }
 async function stopSprint(id){
   try{

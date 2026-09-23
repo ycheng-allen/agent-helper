@@ -2,13 +2,14 @@ import json
 import os
 import sqlite3
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from watch_scheduler import (Scheduler, all_task_snapshots, init_db, validate_rule,
-                             zcode_rewrite_resume_selection, zcode_restore_resume_selection,
-                             zcode_recent_dirs, zcode_task_snapshots)
+from watch_scheduler import (ZCODE_RETRY_SECONDS, Scheduler, all_task_snapshots, init_db,
+                             validate_rule, zcode_retry_due, zcode_rewrite_resume_selection,
+                             zcode_restore_resume_selection, zcode_recent_dirs, zcode_task_snapshots)
 
 SESSION_ID = "sess_11111111-2222-3333-4444-555555555555"
 CWD = "/tmp/demo-zcode-project"
@@ -131,18 +132,72 @@ class ZcodeScheduleTest(unittest.TestCase):
         self.assertIn("boom", err)
 
     def test_zcode_quota_resume_due_without_quota_data(self):
-        # 无 Codex 额度数据也能触发：ZCode 采用重试语义
+        # 无 Codex 额度数据也能触发：额度不可读时 ZCode 退回固定间隔重试语义
+        # （必须打桩 zcode_usage_raw，否则本机真实额度会污染判定分支）
         rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
                               "agent": "zcode", "wait_for_quota": True}, [self.snapshot()])
+        self._insert_rule(rule)
+        with patch("watch_scheduler.zcode_usage_raw", side_effect=RuntimeError("quota unavailable")):
+            self.assertEqual([rule["id"]], self._tick_dispatch())
+
+    def test_zcode_quota_resume_held_when_quota_exhausted(self):
+        # 额度可读但当前窗口已耗尽：等待实时额度恢复，不派发
+        rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
+                              "agent": "zcode", "wait_for_quota": True}, [self.snapshot()])
+        self._insert_rule(rule)
+        exhausted = {"rateLimits": {"primary": {"usedPercent": 100, "resetsAt": time.time() + 3600},
+                                    "secondary": {"usedPercent": 40}}}
+        with patch("watch_scheduler.zcode_usage_raw", return_value=exhausted):
+            self.assertEqual([], self._tick_dispatch())
+
+    def test_zcode_quota_resume_due_when_quota_recovers(self):
+        # 额度恢复为可读且有余量：立即派发
+        rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
+                              "agent": "zcode", "wait_for_quota": True}, [self.snapshot()])
+        self._insert_rule(rule)
+        ready = {"rateLimits": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 10}}}
+        with patch("watch_scheduler.zcode_usage_raw", return_value=ready):
+            self.assertEqual([rule["id"]], self._tick_dispatch())
+
+    def test_zcode_quota_retry_waits_within_interval(self):
+        # 失败后 299 秒：未到重试间隔，不派发
+        rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
+                              "agent": "zcode", "wait_for_quota": True}, [self.snapshot()])
+        self._insert_rule(rule, attempts=1,
+                          finished_at=time.time() - (ZCODE_RETRY_SECONDS - 1))
+        with patch("watch_scheduler.zcode_usage_raw", side_effect=RuntimeError("quota unavailable")):
+            self.assertEqual([], self._tick_dispatch())
+
+    def test_zcode_quota_retry_due_after_interval(self):
+        # 失败后满 300 秒：按固定间隔重试派发
+        rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
+                              "agent": "zcode", "wait_for_quota": True}, [self.snapshot()])
+        self._insert_rule(rule, attempts=1, finished_at=time.time() - ZCODE_RETRY_SECONDS)
+        with patch("watch_scheduler.zcode_usage_raw", side_effect=RuntimeError("quota unavailable")):
+            self.assertEqual([rule["id"]], self._tick_dispatch())
+
+    def test_zcode_retry_due_state_semantics(self):
+        # 显式状态语义：首轮派发；有 finished_at 按间隔；attempts>0 且 finished_at 为空保守立即补派
+        now = 1_000_000
+        self.assertTrue(zcode_retry_due({}, now))                       # 无 attempts（迁移遗留）→ 首轮
+        self.assertTrue(zcode_retry_due({"attempts": 0}, now))          # 首轮
+        self.assertTrue(zcode_retry_due({"attempts": 3, "finished_at": None}, now))  # 空时间戳 → 立即补派
+        self.assertFalse(zcode_retry_due({"attempts": 3, "finished_at": now - ZCODE_RETRY_SECONDS + 1}, now))
+        self.assertTrue(zcode_retry_due({"attempts": 3, "finished_at": now - ZCODE_RETRY_SECONDS}, now))
+
+    def _insert_rule(self, rule, attempts=0, finished_at=None):
         self.conn.execute("""INSERT INTO schedule_rules
             (id,kind,trigger,thread_id,agent,cwd,prompt,quota_after,after_turn_id,status,auto,created_at,
-             started_at,finished_at,error,output)
+             started_at,finished_at,error,output,attempts)
              VALUES(:id,:kind,:trigger,:thread_id,:agent,:cwd,:prompt,:quota_after,:after_turn_id,
-                    :status,:auto,:created_at,:started_at,:finished_at,:error,:output)""", rule)
+                    :status,:auto,:created_at,:started_at,:finished_at,:error,:output,:attempts)""",
+            {**rule, "attempts": attempts, "finished_at": finished_at})
+
+    def _tick_dispatch(self):
         dispatched = []
         with patch.object(self.scheduler, "dispatch", lambda r: dispatched.append(r["id"])):
             self.scheduler.tick()
-        self.assertEqual([rule["id"]], dispatched)
+        return dispatched
 
     def test_failed_zcode_retry_returns_to_waiting(self):
         rule = validate_rule({"kind": "resume", "trigger": "quota", "thread_id": SESSION_ID,
@@ -229,6 +284,7 @@ class ScheduleRuleInsertColumnsTest(unittest.TestCase):
     def test_api_insert_writes_agent_and_params_match(self):
         import re
         import os
+        os.makedirs(CWD, exist_ok=True)  # 不依赖其他测试类先创建目录
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         src = open(os.path.join(here, "agent_helper.py"), encoding="utf-8").read()
         inserts = re.findall(r"INSERT INTO schedule_rules\s*\((.*?)\)", src, re.S)
