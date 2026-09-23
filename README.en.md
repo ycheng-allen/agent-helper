@@ -2,76 +2,143 @@
 
 [中文](README.md) | **English**
 
-Agent Helper (formerly Codex Helper) is a local task monitor and scheduler for Codex and ZCode. It watches running work, remembers the next prompt you meant to send, and resumes the right conversation when a task finishes or quota comes back. The Overview also tracks ZCode usage (read-only import from `~/.zcode/cli/db/`) alongside Codex: models, tokens and errors per agent.
+> The bicycle you're too precious to ride gets stood on and pedaled — Agent Helper pedals it for you!
 
-The Chinese tagline says it best: *the bicycle you are too precious to ride gets stood-on and pedaled by Codex Helper.*
+Agent Helper is a local **task monitor and scheduler for both Codex and ZCode**. It watches running work, remembers the next prompt you meant to send, and delivers it to the right conversation when quota returns, a task finishes, or a scheduled time arrives. The Overview tracks both agents' model usage, tokens, errors and cost side by side.
 
-## What it does
+In short: you set the ambitious goal, Codex writes the code, and Agent Helper picks the work back up right when everyone else has forgotten about it.
 
-### Follow-up prompts
+## Features at a glance
 
-Choose **Project → Task** in the Schedule tab, enter the next prompt, and send it to the same Codex conversation after the current turn finishes. If the selected task has already ended, the follow-up runs immediately.
+| Feature | In one line |
+|---|---|
+| 📊 Dual-agent monitoring | Sessions, turns, tokens, duration and errors for Codex & ZCode, read from local logs |
+| ⏱ Task scheduling | Trigger at a time / after quota reset / after another task — new task, follow-up, or resume |
+| 🔁 Resume after quota | A quota-interrupted task waits for its window to recover, then continues in place |
+| 🚴 Sprint queue | ZCode off-peak queue: time window + up to 50 tasks + 1–6 concurrency |
+| 📶 Live quota | Dual 5-hour / weekly windows for Codex & ZCode, sampled every 30s |
+| 💰 Monthly cost | Month-to-date spend at public list prices (CN & US markets), tunable rates |
+| 🕵️ Model-swap probe | One tiny request to verify the requested model is the served model |
+| 🌐 Bilingual UI | EN / CH toggle; the language also picks the cost currency |
 
-The picker includes every unarchived local work task, including older completed tasks. Subagents and archived tasks are left out so the list stays useful.
+## Layout: three spaces
 
-### Resume after quota limits
+| Space | Contents |
+|---|---|
+| **Overview** | Cross-agent stats: month cost (total + per agent), per-model cost table, daily token/cost trends, live quota |
+| **Codex** | Codex-only task list, scheduling, probe, quota and cost |
+| **ZCode** | ZCode-only task list, scheduling, sprint queue, quota and cost |
 
-> All those beautiful tokens, donated to Sam Altman. What a crime.
+Local task state is scanned every 5 seconds; the Overview refreshes every 30 seconds, or immediately via the refresh button.
 
-Resume a task after a quota interruption, or enable automatic resume for quota interruptions observed after the switch is turned on. A completed task can also be selected for an immediate manual resume.
+## Task scheduling
 
-### Schedule new work
+Three rule types, shared by Codex and ZCode:
 
-Start a new task at a chosen time, after the next quota reset, or after another running task finishes. Pick an existing local Codex project or create a new project directory when the rule actually runs.
+| Rule | Trigger | Typical use |
+|---|---|---|
+| **New task** | At a time / after next quota reset / after another task | Start on schedule, off-peak starts, pipelines |
+| **Follow-up** | Append a prompt to the same conversation after the current turn | The next step without relying on memory |
+| **Resume** | Wait for the live quota window to recover, then continue | Work interrupted by rate limits picks itself back up |
 
-The Schedule tab shows waiting, running and historical rules. Waiting rules can be cancelled.
+Scheduling behavior:
 
-## App layout
+- Tasks are picked **Project → Task**, covering every unarchived local task (older finished ones included); archived tasks and subagents are excluded;
+- If the target task has already ended, the rule runs on save; otherwise it waits for the current turn;
+- The queue shows waiting / running / history; waiting rules can be cancelled;
+- ZCode resume gates on live quota windows (sampled every 30s; falls back to 5-minute retries, up to 8 attempts, when quota is unreadable);
+- Nothing runs while the app or the computer is asleep; after a restart, unfinished rules are flagged for review.
 
-- **Overview**: usage, quota windows, models and local monitoring data;
-- **Task monitoring and scheduling**: task status, automatic resume, Project → Task pickers and the queue;
-- **Queue history**: completed, failed, cancelled and attention-needed rules.
+## Sprint queue (ZCode off-peak)
 
-Task state is scanned every five seconds. The Overview reads live quota from the Codex account API about every 30 seconds and refreshes the display every 30 seconds, showing both remaining and used percentages with a sample time. When a quota-dependent rule is waiting, the background scheduler checks live quota about every ten seconds. The refresh button updates the current tab immediately.
+> All those beautiful tokens, donated to Sam Altman — free off-peak quota shouldn't go to waste.
 
-## Install on macOS Apple Silicon
+- Define a time window: a daily window (e.g. 00:00–08:00, crossing midnight supported) or a one-off window;
+- Queue up to **50 tasks**, each with its own prompt, individually editable and drag-reorderable;
+- Target an existing directory or a new project (created when the first task launches);
+- Concurrency 1–6: 1 is serial, N means up to N tasks at once;
+- Window end or manual stop: running tasks get SIGTERM then SIGKILL after 5s; the rest are skipped;
+- Queues survive app restarts; manual start, stop-all and per-task delete included.
 
-Download the [latest ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest), move Agent Helper to Applications, and open it. The current build is not signed with an Apple Developer ID; use Finder's Open action the first time.
+## Live quota
 
-Build locally with:
+- **Codex**: live quota from the account API, sampled about every 30s; ~10s while a quota-gated rule is waiting;
+- **ZCode**: quota windows (5-hour + weekly) from the account usage API, with remaining/used percentages and reset times;
+- Quota panels appear on the Overview and in each agent space.
+
+## Usage stats and monthly cost
+
+- Codex: parsed from local session indexes and rollout logs — models, turns, tokens, duration, errors;
+- ZCode: read-only incremental import from `~/.zcode/cli/db/db.sqlite`;
+- Overview: month-to-date cost (total + per agent), per-model cost table, daily token/cost trends (last 30 days), cache-hit stats;
+- Costs are computed at public API list prices covering OpenAI and Zhipu's CN/US markets; override rates via `~/.agent-helper/pricing.json`.
+
+## ZCode headless execution (automatic unlock)
+
+ZCode's headless CLI ships without a usable default model (model selection is guarded by the desktop app). Agent Helper:
+
+1. decrypts the coding-plan API key from `~/.zcode/v2/credentials.json`;
+2. writes a standalone personal provider config to `~/.agent-helper/zcode-provider-config.json` (mode 0600);
+3. injects it via the `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` env var — ZCode's own files are never modified;
+4. auto-refreshes the config and retries when an API key rotation breaks execution.
+
+## Install
+
+### macOS Apple Silicon
+
+Download the [latest ARM64 DMG](https://github.com/ycheng-allen/agent-helper/releases/latest), move Agent Helper to Applications and launch. The build is not signed with an Apple Developer ID; use Finder's right-click → Open the first time.
+
+Build from source:
 
 ```bash
+git clone https://github.com/ycheng-allen/agent-helper.git
+cd agent-helper
 npm install
 npm run dist
 ```
 
 The DMG is written to `dist/Agent Helper-*.dmg`.
 
-## Where monitoring came from
+### Run from source directly
 
-The Overview tab, local session parsing, model usage, quota windows, capacity errors and active probe are based on [ysh1112/codex-model-watch](https://github.com/ysh1112/codex-model-watch). Thanks to ysh1112 for the original local Codex log parser, usage dashboard and model probe.
+Requires Python 3.8+ and Node.js:
 
-Agent Helper extends that foundation with an Electron menu-bar app, task monitoring, Project → Task selection, quota resume, follow-up prompts, one-time scheduling and a visible queue. The original monitoring features remain available; they now have a scheduler to keep the work moving.
+```bash
+npm install
+npm start
+```
 
-## Privacy and boundaries
+In development you can also run the local service directly:
 
-Agent Helper reads local Codex session indexes and rollout logs, and imports ZCode usage read-only from `~/.zcode/cli/db/db.sqlite`. Rules are stored in `~/.agent-helper/state.db` (migrated automatically from the old `~/.codex-model-watch/`). The dashboard listens on `127.0.0.1`, and prompts are executed through your existing local Codex CLI session.
+```bash
+python3 agent_helper.py --no-open
+```
 
-This is a local helper, not a cloud queue. It cannot trigger work while the app or computer is asleep. Codex's internal rollout formats may change. The active probe uses a small request and only runs when you explicitly trigger it.
+Everything listens on `127.0.0.1` only. `ZCODE_BIN` overrides ZCode CLI discovery; `--agents codex,zcode` and `--zcode-home` pin the monitoring scope.
 
-ZCode support covers usage statistics plus experimental scheduling. The task picker lists recent ZCode sessions and accepts new-task (at time / after another task), follow-up and resume rules; ZCode resume waits for the live quota windows to recover (sampled every 30s; falls back to 5-minute retries, up to 8 attempts, when quota is unreadable), and new tasks support a next-quota-reset trigger.
+## Data and privacy
 
-The "玩命蹬" (sprint) tab is ZCode-exclusive, built for off-peak free quota: define a time window (a daily window like 00:00–08:00, crossing midnight supported, or a one-off window) and queue up to 50 tasks, each with its own editable prompt and ordering. Pick an existing directory or create a new project (parent path + folder name, created when the first task launches). When the window opens, tasks run at the configured concurrency — 1 means serial, N (max 6) means up to N in parallel. When the window ends or you hit stop, running tasks are terminated (SIGTERM, then SIGKILL after 5s) and the remaining queue is marked skipped; queues survive app restarts.
+| Path | Contents |
+|---|---|
+| `~/.agent-helper/state.db` | Schedule rules, history and saved projects |
+| `~/.agent-helper/pricing.json` | Optional price / FX-rate overrides |
+| `~/.agent-helper/zcode-provider-config.json` | Provider config for ZCode headless runs (0600) |
+| `~/.zcode/cli/db/db.sqlite` | ZCode usage database (read-only) |
+| `~/.codex/sessions/` etc. | Codex session logs (read-only) |
 
-ZCode's headless CLI ships without a usable default model (model selection is guarded by the desktop app). Helper decrypts the local coding-plan API key from `~/.zcode/v2/credentials.json`, writes a standalone personal provider config to `~/.agent-helper/zcode-provider-config.json` (mode 0600), and injects it via `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` — ZCode's own files are never modified; rotated API keys trigger an automatic refresh and retry. Point `ZCODE_BIN` at a custom CLI to override discovery. The swap probe remains Codex-only; the quota panel works for both agents (ZCode usage comes from its account quota API). By default (`--agents auto`) the monitored agents are detected from the local data directories; override with `--agents codex,zcode` and `--zcode-home`.
-
-## License
-
-MIT, with attribution to the original project. See [LICENSE](LICENSE).
+The data directory migrated automatically from the old `~/.codex-model-watch/`. Projects, prompts and task titles never leave your machine; there is no cloud queue — prompts are executed through your existing local CLI logins.
 
 ## Known limits
 
-The ZCode desktop app renders an open conversation from its in-memory runtime, so turns submitted by any headless scheduler (including Agent Helper) are persisted to ZCode's database but only appear in the desktop UI once that session is reloaded (e.g. after restarting ZCode, or reopening a session that wasn't live). Execution itself and the persisted history are unaffected.
+- A local helper, not a cloud queue: nothing triggers while the app or computer is asleep;
+- **ZCode desktop display**: turns submitted by any headless scheduler persist to ZCode's database, but the desktop renders an open conversation from its in-memory runtime — the new turns appear once that session is reloaded (e.g. after restarting ZCode); execution and history are unaffected;
+- The model-swap probe is Codex-only;
+- Codex rollout/state formats are internal and may change between versions;
+- The probe only sends when you click it; past swaps can't be recovered from history logs.
+
+## Acknowledgements
+
+The Overview, usage parsing, quota windows, capacity errors and the active probe are based on [ysh1112/codex-model-watch](https://github.com/ysh1112/codex-model-watch). Thanks to ysh1112 for the original local Codex log parser, usage dashboard and model probe.
 
 ## License
 
