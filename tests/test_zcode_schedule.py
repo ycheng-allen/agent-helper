@@ -9,7 +9,8 @@ from unittest.mock import patch
 
 from watch_scheduler import (ZCODE_RETRY_SECONDS, Scheduler, all_task_snapshots, init_db,
                              validate_rule, zcode_retry_due, zcode_rewrite_resume_selection,
-                             zcode_restore_resume_selection, zcode_recent_dirs, zcode_task_snapshots)
+                             zcode_restore_resume_selection, zcode_recent_dirs, zcode_task_snapshots,
+                             zcode_usage_raw)
 
 SESSION_ID = "sess_11111111-2222-3333-4444-555555555555"
 CWD = "/tmp/demo-zcode-project"
@@ -130,6 +131,60 @@ class ZcodeScheduleTest(unittest.TestCase):
             env, err = zcode_env()
         self.assertIsNone(env)
         self.assertIn("boom", err)
+
+    def test_zcode_quota_percentage_is_used_percent_and_invalid_windows_are_skipped(self):
+        # The provider's percentage is usage: 100 means exhausted, 0 means unused.
+        payload = {"code": 200, "data": {"limits": [
+            {"unit": 3, "number": 5, "percentage": 0, "nextResetTime": None},
+            {"unit": "6", "number": "1", "percentage": "100", "nextResetTime": "1790758175944"},
+            {"unit": 3, "number": 5, "percentage": None},
+            {"unit": 3, "number": 5, "percentage": 101},
+            {"unit": 3, "number": 5, "percentage": -1},
+            {"unit": 3, "number": 5, "percentage": "abc"},
+            {"unit": 99, "number": 1, "percentage": 50},
+        ]}}
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps(payload).encode()
+
+        with patch("watch_scheduler.zcode_api_key", return_value="test-key"), \
+             patch("urllib.request.urlopen", return_value=Response()):
+            result = zcode_usage_raw()
+
+        self.assertEqual("bigmodel_usage_api", result["source"])
+        self.assertEqual("percentage", result["sourceField"])
+        self.assertEqual({"usedPercent": 0.0, "windowDurationMins": 300, "resetsAt": None},
+                         result["rateLimits"]["primary"])
+        self.assertEqual(100.0, result["rateLimits"]["secondary"]["usedPercent"])
+        self.assertEqual(1790758175.944, result["rateLimits"]["secondary"]["resetsAt"])
+
+    def test_zcode_quota_all_invalid_windows_fails_closed(self):
+        payload = {"code": 200, "data": {"limits": [
+            {"unit": 3, "number": 5, "percentage": "not-a-number"},
+            {"unit": 99, "number": 1, "percentage": 50},
+        ]}}
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps(payload).encode()
+
+        with patch("watch_scheduler.zcode_api_key", return_value="test-key"), \
+             patch("urllib.request.urlopen", return_value=Response()):
+            with self.assertRaisesRegex(RuntimeError, "没有可用窗口"):
+                zcode_usage_raw()
 
     def test_zcode_quota_resume_due_without_quota_data(self):
         # 无 Codex 额度数据也能触发：额度不可读时 ZCode 退回固定间隔重试语义

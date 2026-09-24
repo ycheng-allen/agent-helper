@@ -738,6 +738,8 @@ function renderQuota(quota,agent='codex'){
     if(window.reset_after_seconds!=null)return Math.round(window.reset_after_seconds/3600)+' '+t('afterH');
     return '';
   };
+  // Both Codex and ZCode expose usedPercent here. This is the only UI conversion
+  // point: the visible water level is the remaining percentage.
   const bar=(tag,value,window)=>{
     const valid=value!=null&&Number.isFinite(Number(value));
     const remaining=valid?Math.max(0,Math.min(100,100-Number(value))):0;

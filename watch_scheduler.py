@@ -2,6 +2,7 @@
 import glob
 import getpass
 import json
+import math
 import os
 import re
 import select
@@ -282,6 +283,11 @@ def zcode_usage_raw(credentials_path=None, timeout=10):
 
     GET {ZCODE_QUOTA_URL} with Authorization: <coding-plan api key>. Response limits are
     CREDIT_LIMIT entries; the smallest window becomes "primary", the other "secondary".
+
+    The upstream ``percentage`` field is the used percentage, not the remaining
+    percentage. This was verified against the live usage/currentValue/remaining
+    relationship and ZCode's own ``100 - percentage`` UI formula on 2026-09-24.
+    Invalid windows are skipped and an entirely invalid response fails closed.
     """
     import urllib.request
     import urllib.error
@@ -293,18 +299,33 @@ def zcode_usage_raw(credentials_path=None, timeout=10):
         raise RuntimeError("ZCode 额度接口返回异常: " + str(payload.get("msg") or payload.get("code"))[:120])
     windows = []
     for limit in (payload.get("data") or {}).get("limits") or []:
-        mins = _ZCODE_UNIT_MINS.get(limit.get("unit"))
-        pct = limit.get("percentage")
-        if mins is None or pct is None:
+        try:
+            unit = int(limit.get("unit"))
+            mins = _ZCODE_UNIT_MINS.get(unit)
+            number = float(limit.get("number") or 1)
+            pct = float(limit.get("percentage"))
+        except (TypeError, ValueError):
             continue
-        windows.append({"windowDurationMins": mins * int(limit.get("number") or 1),
-                        "usedPercent": float(pct),
-                        "resetsAt": (limit.get("nextResetTime") or 0) / 1000 or None})
+        if (mins is None or not math.isfinite(number) or number <= 0 or
+                not number.is_integer() or not math.isfinite(pct) or not 0 <= pct <= 100):
+            continue
+        reset_at = None
+        if limit.get("nextResetTime") not in (None, ""):
+            try:
+                reset_ms = float(limit.get("nextResetTime"))
+                if math.isfinite(reset_ms) and reset_ms > 0:
+                    reset_at = reset_ms / 1000
+            except (TypeError, ValueError):
+                pass
+        windows.append({"windowDurationMins": mins * int(number),
+                        "usedPercent": pct,
+                        "resetsAt": reset_at})
     windows.sort(key=lambda w: w["windowDurationMins"])
     if not windows:
         raise RuntimeError("ZCode 额度响应中没有可用窗口")
     names = ["primary", "secondary"]
-    return {"rateLimits": {names[i]: w for i, w in enumerate(windows[:2])}}
+    return {"rateLimits": {names[i]: w for i, w in enumerate(windows[:2])},
+            "source": "bigmodel_usage_api", "sourceField": "percentage"}
 
 
 def read_zcode_quota(credentials_path=None, timeout=10):
